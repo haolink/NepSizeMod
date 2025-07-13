@@ -1,0 +1,52 @@
+﻿html, body {
+    margin: 0px;
+}
+
+*.base-padding {
+    padding: 5px;
+}
+
+*.no-padding {
+    padding: 0px;
+}
+
+.container-fluid {
+    padding: 0px;
+}
+
+.row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+table.table {
+    margin: 0;
+}
+
+thead tr {
+    text-align: center;
+}
+
+tr.c-active td, option.c-active {
+    color: blue;
+    font-weight: 600;
+}
+
+tr.c-active input[type=text] {
+    border: 1px solid blue;
+}
+
+input[type=text].v-invalid {
+    border: 1px solid red;
+}
+
+tbody tr#no-characters.dont-show {
+    display: none;
+}
+.debug-hide {
+    display: none;
+}
+span.debug-unknown {
+    font-weight: bold;
+    color: red;
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- ILRepack -->
+  <Target Name="ILRepacker" AfterTargets="Build">
+    <ItemGroup>
+      <AssembliesToMerge Include="$(OutputPath)/$(AssemblyName).dll" />
+      <AssembliesToMerge Include="$(OutputPath)/NepSizeCore.dll" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Text.Json'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Text.Encodings.Web'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Memory'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Runtime.CompilerServices.Unsafe'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Buffers'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Numerics.Vectors'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'System.Threading.Tasks.Extensions'" />
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'Microsoft.Bcl.AsyncInterfaces'" />      
+    </ItemGroup>
+
+    <ILRepack
+      InputAssemblies="@(AssembliesToMerge)"
+      Internalize="true"
+      Verbose="false"
+      DebugInfo="true"
+      Parallel="true"
+      LibraryPath="./Dependencies"
+      OutputFile="$(OutputPath)/$(AssemblyName)Merged.dll"
+    />
+  </Target>
+</Project>
