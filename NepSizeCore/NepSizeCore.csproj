@@ -8,6 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="webresources\assets\applogic.js" />
+    <EmbeddedResource Include="webresources\assets\bootstrap.min.css" />
+    <EmbeddedResource Include="webresources\assets\character-data.js" />
+    <EmbeddedResource Include="webresources\assets\jsinterop.js" />
+    <EmbeddedResource Include="webresources\assets\style.css" />
+    <EmbeddedResource Include="webresources\index.html" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="4.6.0" />
   </ItemGroup>
 

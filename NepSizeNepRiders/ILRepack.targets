@@ -10,6 +10,7 @@
     <ItemGroup>
       <LibraryPaths Include="./Dependencies" />
       <LibraryPaths Include="$(UserProfile)/.nuget/packages/bepinex.core/6.0.0-be.738/lib/netstandard2.0" />
+      <LibraryPaths Include="$(UserProfile)/.nuget/packages/system.text.json/4.6.0/lib/netstandard2.0" />
     </ItemGroup>
     
     <ILRepack

@@ -44,7 +44,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(new ServerCommands("NPRD", this));
+        this._sizeDataThread = new SizeDataThread(this, new ServerCommands("NPRD", this));
     }
 
     /// <summary>
@@ -169,5 +169,10 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     public void DebugLog(string message)
     {
         Debug.Log(message);
+    }
+
+    public CharacterList GetCharacterList()
+    {
+        return null;
     }
 }

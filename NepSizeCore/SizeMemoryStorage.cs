@@ -236,7 +236,7 @@ namespace NepSizeCore
                 {
                     entries[size.Key] = f;
                 }
-            }
+            }            
 
             // Veryify
             if (entries.Count > MAX_SCALELIST_LENGTH)
@@ -248,9 +248,12 @@ namespace NepSizeCore
             this._scaleListMemoryStream.Seek(0, SeekOrigin.Begin);
             foreach (KeyValuePair<uint, float> entry in entries)
             {
+                this._plugin.DebugLog("Writing " + entry.Key.ToString() + " --> " + entry.Value.ToString("F2"));
                 this._scaleListMemoryWriter.Write(entry.Key);
                 this._scaleListMemoryWriter.Write(entry.Value);
             }
+            this._plugin.DebugLog("Written");
+
             this._scaleListMemoryWriter.Write(((uint)0));
         }
 

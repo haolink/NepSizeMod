@@ -10,6 +10,7 @@ Prebuilt versions including user instructions will follow soon.
 
 ## NepSizeCore
 This contains some core functionality which is shared in all games. In all games the UI communicates with the mod using Named Pipes - this core contains the pipe server and implements the commands which are sent to it. It also reserves memory for the UI to interact with as the main size changes are done using memory tampering.
+Other than the UI all mods also spawn a web server on port 7979 - this one has a websocket based communication layer to the respective mod as well.
 
 All interactions with Unity are done in the game specific mods - as the games all use different Unity versions (in case of SvS it even uses Mono rather than IL2CPP) this project only contains communication layers - even if the Main plugins are also using pretty similar code.
 
@@ -29,7 +30,8 @@ All these tools can be built using normal dotnet console client or using VS 2022
 
 You will need to supply the BepInEx interop libraries for each project yourself.
 
-# License
+# Licenses
 - [BepinEx](https://github.com/BepInEx/BepInEx) is licensed under the GNU Lesser General Public License v2.1.
+- [websocket-sharp](https://github.com/sta/websocket-sharp) This project uses websocket-sharp and includes code of it in NepSizeCore. Websocket-sharp is licensed under the MIT license.
 
 This project is licensed under the BSD-3 license. See LICENSE for more details.

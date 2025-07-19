@@ -32,6 +32,11 @@ namespace NepSizeCore
         public JsonElement? Data { get; set; }
 
         /// <summary>
+        /// UUID (optional)
+        /// </summary>
+        public string? UUID { get; set; }
+
+        /// <summary>
         /// Main constructur of a reply.
         /// </summary>
         /// <param name="type"></param>

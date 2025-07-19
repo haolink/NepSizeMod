@@ -1,7 +1,37 @@
+using System;
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace NepSizeCore
 {
+    /// <summary>
+    /// Description of a character set.
+    /// </summary>
+    [Serializable]
+    public class CharacterData
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; private set; }
+        [JsonPropertyName("name")]
+        public string Name { get; private set; }
+        [JsonPropertyName("text")]
+        public string Text { get; private set; }
+
+        public CharacterData(int id, string name, string text)
+        {
+            Id = id;
+            Name = name;
+            Text = text;
+        }
+    }
+
+    /// <summary>
+    /// A list of characters for a game.
+    /// </summary>
+    [Serializable]
+    public class CharacterList : Dictionary<string, List<CharacterData>> { }
+    
+
     /// <summary>
     /// Set of methods each default size plugin must provide. While several implementations of the final plugins
     /// are heavily identical as each game is compiled against a different version of Unity, only the main plugins
@@ -15,6 +45,12 @@ namespace NepSizeCore
         /// <param name="sizes">Character ID to scale Dictionary</param>
         /// <param name="overwrite">Replace old sizes</param>
         void UpdateSizes(Dictionary<uint, float> sizes, bool overwrite);
+
+        /// <summary>
+        /// Queries the list of characters in a game.
+        /// </summary>
+        /// <returns></returns>
+        CharacterList GetCharacterList();
         
         /// <summary>
         /// Determine the currently active characters on-screen.

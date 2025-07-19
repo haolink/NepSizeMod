@@ -17,6 +17,133 @@ namespace NepSizeCore
     /// </summary>
     public class SizeDataThread
     {
+        internal interface IOutputWriter 
+        {
+            /// <summary>
+            /// Sets an output UUID.
+            /// </summary>
+            /// <param name="uuid"></param>
+            public void SetUUID(string uuid);
+
+            /// <summary>
+            /// Writes a JSON string into the output stream system.
+            /// </summary>
+            /// <param name="outputData">Json info to write.</param>
+            public void SendReply(SizeServerResponse outputData);
+
+            /// <summary>
+            /// Close the connection if required.
+            /// </summary>
+            public void CloseSystem();
+        }
+
+        internal class PipeOutputWriter : IOutputWriter
+        {
+            /// <summary>
+            /// Pipe to write
+            /// </summary>
+            private NamedPipeServerStream _pipe;
+
+            /// <summary>
+            /// Message UUID.
+            /// </summary>
+            private string _uuid = null;
+
+            /// <summary>
+            /// Constructor.
+            /// </summary>
+            /// <param name="pipe"></param>
+            public PipeOutputWriter(NamedPipeServerStream pipe)
+            {
+                _pipe = pipe;
+            }
+
+            /// <summary>
+            /// Send a reply.
+            /// </summary>
+            /// <param name="outputData"></param>
+            public void SendReply(SizeServerResponse outputJson)
+            {
+                string outputData = JsonSerializer.Serialize(outputJson);
+
+                byte[] utfResponse = UTF8Encoding.UTF8.GetBytes(outputData);
+                byte[] replyLength = BitConverter.GetBytes(utfResponse.Length);
+
+                this._pipe.Write(replyLength, 0, 4);
+                this._pipe.Write(utfResponse, 0, utfResponse.Length);
+                this._pipe.Flush();
+            }
+
+            /// <summary>
+            /// Sets a message UUID.
+            /// </summary>
+            /// <param name="UUID">UUID.</param>
+            public void SetUUID(string UUID)
+            {
+                _uuid = UUID;
+            }
+
+            /// <summary>
+            /// Close the pipe.
+            /// </summary>
+            public void CloseSystem()
+            {
+                if (this._pipe != null)
+                {
+                    this._pipe.Dispose();
+                }
+                this._pipe = null;
+            }
+        }
+
+        internal class WebsocketOutputWrite : IOutputWriter
+        {
+            /// <summary>
+            /// Websocket to write into.
+            /// </summary>
+            private WebUIJsonHandler _wsHandler;
+
+            /// <summary>
+            /// Message UUID.
+            /// </summary>
+            private string _uuid = null;
+
+            /// <summary>
+            /// Constructor.
+            /// </summary>
+            /// <param name="pipe"></param>
+            public WebsocketOutputWrite(WebUIJsonHandler wsHandler)
+            {
+                _wsHandler = wsHandler;
+            }
+
+            /// <summary>
+            /// Sets a message UUID.
+            /// </summary>
+            /// <param name="UUID">UUID.</param>
+            public void SetUUID(string UUID)
+            {
+                _uuid = UUID;
+            }
+
+            /// <summary>
+            /// Send a reply.
+            /// </summary>
+            /// <param name="outputData"></param>
+            public void SendReply(SizeServerResponse outputData)
+            {
+                _wsHandler.SendReply(outputData, _uuid);
+            }
+
+            /// <summary>
+            /// Close the websocket (not needed WebsocketSharp does this).
+            /// </summary>
+            public void CloseSystem()
+            {
+                // Empty
+            }
+        }
+
         /// <summary>
         /// Internal information class of a client connection.
         /// </summary>
@@ -27,9 +154,9 @@ namespace NepSizeCore
             /// </summary>
             public Func<SizeServerResponse> Action { get; private set; }
             /// <summary>
-            /// What is the client pipe.
+            /// What is the client output.
             /// </summary>
-            public NamedPipeServerStream Pipe { get; private set; }
+            public IOutputWriter Output { get; private set; }
 
             /// <summary>
             /// Is the connection closed?
@@ -41,11 +168,11 @@ namespace NepSizeCore
             /// </summary>
             /// <param name="action">Method to call in the Unity main thread.</param>
             /// <param name="pipe">Pipe to write the answer into.</param>
-            public ConnectionData(Func<SizeServerResponse> action, NamedPipeServerStream pipe)
+            public ConnectionData(Func<SizeServerResponse> action, IOutputWriter output)
             {
                 _closed = false;
                 Action = action;
-                Pipe = pipe;
+                Output = output;
             }
 
             /// <summary>
@@ -64,14 +191,9 @@ namespace NepSizeCore
                 {
                     // Parse the reply, send it in a new non-blocking thread.
                     Thread t = new Thread(() =>
-                    {
-                        string reply = JsonSerializer.Serialize(returnValue);
-                        byte[] utfResponse = UTF8Encoding.UTF8.GetBytes(reply);
-                        byte[] replyLength = BitConverter.GetBytes(utfResponse.Length);
+                    {                                                
+                        Output.SendReply(returnValue);
 
-                        Pipe.Write(replyLength, 0, 4);
-                        Pipe.Write(utfResponse, 0, utfResponse.Length);
-                        Pipe.Flush();
                         this.Close();
                     });
                     t.Start();
@@ -85,10 +207,10 @@ namespace NepSizeCore
             {
                 if (!_closed)
                 {
-                    if (this.Pipe != null)
+                    if (Output != null)
                     {
-                        this.Pipe.Dispose();
-                    }
+                        Output.CloseSystem();
+                    }                    
                     _closed = true;
                 }
             }
@@ -122,27 +244,41 @@ namespace NepSizeCore
         /// <summary>
         /// Map cache of commands.
         /// </summary>
-        private Dictionary<string, MethodInfo> _commandMap = new();       
+        private Dictionary<string, MethodInfo> _commandMap = new();
+
+        /// <summary>
+        /// Web UI management class.
+        /// </summary>
+        private WebUI _webUI;
+
+        /// <summary>
+        /// Main game plugin.
+        /// </summary>
+        private INepSizeGamePlugin _mainPlugin;
 
         /// <summary>
         /// Initialises the main pipe server thread.
         /// </summary>
         /// <param name="serverCommands"></param>
-        public SizeDataThread(ServerCommands serverCommands)
+        public SizeDataThread(INepSizeGamePlugin mainPlugin, ServerCommands serverCommands)
         {
             _serverCommands = serverCommands;
+            _mainPlugin = mainPlugin;
 
             RegisterAllCommands();
 
             _pipeCancellation = new CancellationTokenSource();
             _mainThreadActiveConnections = new ConcurrentQueue<ConnectionData>();
 
-            _pipeThread = new Thread(() => RunServer(_pipeCancellation.Token))
+            _pipeThread = new Thread(() => {
+                InitialiseWebUI();
+                RunServer(_pipeCancellation.Token);
+            })
             {
                 IsBackground = true,
                 Priority = System.Threading.ThreadPriority.Lowest
             };
-            _pipeThread.Start();
+            _pipeThread.Start();            
 
             _serverCommands.Log("Thread started");
         }
@@ -174,10 +310,11 @@ namespace NepSizeCore
         {
             while (this._mainThreadActiveConnections.TryDequeue(out ConnectionData action))
             {
-                if (action.Pipe.IsConnected)
+                /*if (action.Pipe.IsConnected)
                 {
                     action.Pipe.Dispose();
-                }
+                }*/
+                action.Close();
             }
             while (_mainThreadActiveConnections.TryDequeue(out _)) { }
             _pipeCancellation.Cancel();
@@ -185,6 +322,27 @@ namespace NepSizeCore
             _currentPipe?.Dispose();
 
             _pipeThread.Join();
+        }
+
+        /// <summary>
+        /// Web UI shall be initialised.
+        /// </summary>
+        private void InitialiseWebUI()
+        {
+            _webUI = new WebUI(this._mainPlugin.GetCharacterList());
+            _webUI.Log += WebUIDebugLog;
+            _webUI.MessageReceived += WebUIMessageReceived;
+            _webUI.Start();
+        }
+
+        /// <summary>
+        /// Allow the Web UI to log to the output.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void WebUIDebugLog(object sender, LogEvent e)
+        {
+            DebugLogThreadSafe(e.Message);
         }
 
         /// <summary>
@@ -256,7 +414,7 @@ namespace NepSizeCore
                 }
 
                 string message = Encoding.UTF8.GetString(payloadBuffer);
-                HandleMessage(pipe, message);
+                HandleMessage(new PipeOutputWriter(pipe), message);
             }
             catch (IOException ex)
             {
@@ -268,35 +426,45 @@ namespace NepSizeCore
         /// Send an error on the pipe reply.
         /// </summary>
         /// <param name="msg">Message text</param>
-        /// <param name="pipe">Output stream.</param>
-        private void CreateErrorReply(string msg, NamedPipeServerStream pipe)
+        /// <param name="output">Output stream.</param>
+        private void CreateErrorReply(string msg, IOutputWriter output)
         {
             this._mainThreadActiveConnections.Enqueue(new ConnectionData(() =>
             {
                 return SizeServerResponse.ReturnError(msg, null);
-            }, pipe));
+            }, output));
         }
 
         /// <summary>
         /// Send an exception on the pipe reply.
         /// </summary>
         /// <param name="msg">Message text</param>
-        /// <param name="pipe">Output stream.</param>
-        private void CreateExceptionReply(string msg, NamedPipeServerStream pipe)
+        /// <param name="output">Output stream.</param>
+        private void CreateExceptionReply(string msg, IOutputWriter output)
         {
             this._mainThreadActiveConnections.Enqueue(new ConnectionData(() =>
             {
                 return SizeServerResponse.ReturnError(msg, null);
-            }, pipe));
+            }, output));
+        }
+
+        /// <summary>
+        /// We got a message via the websocket.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void WebUIMessageReceived(object sender, WebSocketMessageEvent e)
+        {
+            HandleMessage(new WebsocketOutputWrite(e.Handler), e.Message);
         }
 
         /// <summary>
         /// Message unpacked successfully to a string. Deserialise as JSON.
         /// </summary>
-        /// <param name="pipe">Pipe stream.</param>
+        /// <param name="output">Reply stream.</param>
         /// <param name="message">Message string.</param>
         /// <returns></returns>
-        private bool HandleMessage(NamedPipeServerStream pipe, string message)
+        private bool HandleMessage(IOutputWriter output, string message)
         {
             DebugLogThreadSafe("Received: " + message);
 
@@ -317,15 +485,20 @@ namespace NepSizeCore
 
                 if (cmd == null || string.IsNullOrEmpty(cmd.command))
                 {
-                    this.CreateExceptionReply($"Unknown data structure!", pipe);
+                    this.CreateExceptionReply($"Unknown data structure!", output);
                     return false;
                 }
 
-                return this.TryInvoke(cmd.command, cmd.data, pipe);
+                if (!string.IsNullOrEmpty(cmd.UUID))
+                {
+                    output.SetUUID(cmd.UUID);
+                }
+
+                return this.TryInvoke(cmd.command, cmd.data, output);
             }
             catch (Exception ex)
             {
-                this.CreateExceptionReply($"JSON parsing error {ex.Message}", pipe);
+                this.CreateExceptionReply($"JSON parsing error {ex.Message}", output);
                 return false;
             }
         }        
@@ -335,15 +508,15 @@ namespace NepSizeCore
         /// </summary>
         /// <param name="commandName">COmmand to run.</param>
         /// <param name="data">Parameters</param>
-        /// <param name="pipe">Pipe stream</param>
+        /// <param name="output">Output stream</param>
         /// <returns>Can it correctly be executed?</returns>
-        private bool TryInvoke(string commandName, JsonElement? data, NamedPipeServerStream pipe)
+        private bool TryInvoke(string commandName, JsonElement? data, IOutputWriter output)
         {
 #pragma warning disable 8632
             // Get action
             if (!_commandMap.TryGetValue(commandName, out MethodInfo method))
             {
-                this.CreateExceptionReply($"Unknown command: {commandName}", pipe);
+                this.CreateExceptionReply($"Unknown command: {commandName}", output);
                 return false;
             }
 
@@ -357,13 +530,13 @@ namespace NepSizeCore
                 this._mainThreadActiveConnections.Enqueue(new ConnectionData(() =>
                 {
                     return (SizeServerResponse?)method.Invoke(_serverCommands, null);
-                }, pipe));
+                }, output));
                 return true;
             }
 
             if (data == null || data.Value.ValueKind != JsonValueKind.Object)
             {
-                this.CreateExceptionReply($"Missing or invalid 'data' field for command '{commandName}'.", pipe);
+                this.CreateExceptionReply($"Missing or invalid 'data' field for command '{commandName}'.", output);
                 return false;
             }
 
@@ -375,7 +548,7 @@ namespace NepSizeCore
                     // Use default value if possible.
                     if (!param.HasDefaultValue)
                     {
-                        this.CreateExceptionReply($"Missing parameter: {param.Name}", pipe);
+                        this.CreateExceptionReply($"Missing parameter: {param.Name}", output);
                         return false;
                     }
                     else
@@ -392,7 +565,7 @@ namespace NepSizeCore
                     }
                     catch (Exception ex)
                     {
-                        this.CreateExceptionReply($"Parameter parse error for '{param.Name}': {ex.Message}", pipe);
+                        this.CreateExceptionReply($"Parameter parse error for '{param.Name}': {ex.Message}", output);
                         return false;
                     }
                 }            
@@ -404,12 +577,12 @@ namespace NepSizeCore
                 this._mainThreadActiveConnections.Enqueue(new ConnectionData(() =>
                 {
                     return (SizeServerResponse?)method.Invoke(_serverCommands, args);
-                }, pipe));
+                }, output));
                 return true;
             }
             catch (Exception ex)
             {
-                this.CreateExceptionReply($"Exception in '{commandName}': {ex.Message}", pipe);
+                this.CreateExceptionReply($"Exception in '{commandName}': {ex.Message}", output);
                 return false;
             }
             #pragma warning restore 8632
@@ -450,6 +623,7 @@ namespace NepSizeCore
         [Serializable]
         internal class GenericCommand
         {
+            public string UUID { get; set; }
             public string command { get; set; }
             public JsonElement? data { get; set; }
         }    

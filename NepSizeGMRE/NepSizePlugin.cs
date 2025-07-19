@@ -44,7 +44,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(new ServerCommands("GMRE", this));
+        this._sizeDataThread = new SizeDataThread(this, new ServerCommands("GMRE", this));
     }
 
     /// <summary>
@@ -136,5 +136,140 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     public void DebugLog(string message)
     {
         Debug.Log(message);
+    }
+
+    public CharacterList GetCharacterList()
+    {
+        return new CharacterList()
+        {
+            { "Adult Neptune", new List<CharacterData>()
+                {
+                    new CharacterData(id: 1500, text: "Default Outfit", name: "Adult Neptune"),
+                    new CharacterData(id: 1510, text: "Generator Unit", name: "Adult Neptune (Generator Unit)"),
+                    new CharacterData(id: 1560, text: "Swimsuit Outfit", name: "Adult Neptune (Swimsuit)"),
+                }
+            },
+            { "Pippih", new List<CharacterData>()
+                {
+                    new CharacterData(id: 1600, text: "Default Outfit", name: "Pippih"),
+                    new CharacterData(id: 1610, text: "Goddess Form", name: "Pippih (Goddess Form)"),
+                    new CharacterData(id: 1660, text: "Swimsuit Outfit", name: "Pippih (Swimsuit)"),
+                }
+            },
+            { "Jagga", new List<CharacterData>()
+                {
+                    new CharacterData(id: 1600, text: "Default Outfit", name: "Jagga"),
+                    new CharacterData(id: 1610, text: "Goddess Form", name: "Jagga (Goddess Form)"),
+                    new CharacterData(id: 1660, text: "Swimsuit Outfit", name: "Jagga (Swimsuit)"),
+                }
+            },
+            { "Reedio", new List<CharacterData>()
+                {
+                    new CharacterData(id: 1700, text: "Default Outfit", name: "Reedio"),
+                    new CharacterData(id: 1710, text: "Goddess Form", name: "Reedio (Goddess Form)"),
+                    new CharacterData(id: 1760, text: "Swimsuit Outfit", name: "Reedio (Swimsuit)"),
+                }
+            },
+            { "Neptune", new List<CharacterData>()
+                {
+                    new CharacterData(id: 100, text: "Default Outfit", name: "Neptune"),
+                    new CharacterData(id: 110, text: "Purple Heart", name: "Purple Heart"),
+                    new CharacterData(id: 160, text: "Swimsuit Outfit", name: "Neptune (Swimsuit)"),
+                }
+            },
+            { "Noire", new List<CharacterData>()
+                {
+                    new CharacterData(id: 200, text: "Default Outfit", name: "Noire"),
+                    new CharacterData(id: 210, text: "Black Heart", name: "Black Heart"),
+                    new CharacterData(id: 260, text: "Swimsuit Outfit", name: "Noire (Swimsuit)"),
+                }
+            },
+            { "Blanc", new List<CharacterData>()
+                {
+                    new CharacterData(id: 300, text: "Default Outfit", name: "Blanc"),
+                    new CharacterData(id: 310, text: "White Heart", name: "White Heart"),
+                    new CharacterData(id: 360, text: "Swimsuit Outfit", name: "Blanc (Swimsuit)"),
+                }
+            },
+            { "Vert", new List<CharacterData>()
+                {
+                    new CharacterData(id: 400, text: "Default Outfit", name: "Vert"),
+                    new CharacterData(id: 410, text: "Green Heart", name: "Green Heart"),
+                    new CharacterData(id: 460, text: "Swimsuit Outfit", name: "Vert (Swimsuit)"),
+                }
+            },
+            { "Nepgear", new List<CharacterData>()
+                {
+                    new CharacterData(id: 500, text: "Default Outfit", name: "Nepgear"),
+                    new CharacterData(id: 510, text: "Purple Sister", name: "Purple Sister"),
+                    new CharacterData(id: 560, text: "Swimsuit Outfit", name: "Nepgear (Swimsuit)"),
+                }
+            },
+            { "Uni", new List<CharacterData>()
+                {
+                    new CharacterData(id: 600, text: "Default Outfit", name: "Uni"),
+                    new CharacterData(id: 610, text: "Black Sister", name: "Black Sister"),
+                    new CharacterData(id: 660, text: "Swimsuit Outfit", name: "Uni (Swimsuit)"),
+                }
+            },
+            { "Rom", new List<CharacterData>()
+                {
+                    new CharacterData(id: 700, text: "Default Outfit", name: "Rom"),
+                    new CharacterData(id: 710, text: "White Sister", name: "White Sister Rom"),
+                    new CharacterData(id: 760, text: "Swimsuit Outfit", name: "Rom (Swimsuit)"),
+                }
+            },
+            { "Ram", new List<CharacterData>()
+                {
+                    new CharacterData(id: 800, text: "Default Outfit", name: "Ram"),
+                    new CharacterData(id: 810, text: "White Sister", name: "White Sister Ram"),
+                    new CharacterData(id: 860, text: "Swimsuit Outfit", name: "Ram (Swimsuit)"),
+                }
+            },
+            { "Shas", new List<CharacterData>()
+                {
+                    new CharacterData(id: 1900, text: "F-Sha", name: "F-Sha"),
+                    new CharacterData(id: 2000, text: "B-Sha", name: "B-Sha"),
+                    new CharacterData(id: 2100, text: "C-Sha", name: "C-Sha"),
+                    new CharacterData(id: 2200, text: "K-Sha", name: "K-Sha"),
+                    new CharacterData(id: 2300, text: "S-Sha", name: "S-Sha"),
+                }
+            },
+            { "Antagonists", new List<CharacterData>()
+                {
+                    new CharacterData(id: 5503, text: "Arfoire", name: "Arfoire"),
+                    new CharacterData(id: 5506, text: "Copy-The-Hard", name: "Copy-The-Hard"),
+                    new CharacterData(id: 5507, text: "Copy-The-Code", name: "Copy-The-Code"),
+                    new CharacterData(id: 5508, text: "Copy-The-Art", name: "Copy-The-Art"),
+                    new CharacterData(id: 2700, text: "Croire", name: "Croire"),
+                }
+            },
+            { "Male Citizens", new List<CharacterData>()
+                {
+                    new CharacterData(id: 9001, text: "Male 1", name: "Male Citizen 1"),
+                    new CharacterData(id: 9002, text: "Male 2", name: "Male Citizen 2"),
+                    new CharacterData(id: 9003, text: "Male 3", name: "Male Citizen 3"),
+                    new CharacterData(id: 9007, text: "Male 4 (Elder)", name: "Elderly Male 4"),
+                    new CharacterData(id: 9008, text: "Male 5 (Elder)", name: "Elderly Male 5"),
+                    new CharacterData(id: 9009, text: "Male 6 (Elder)", name: "Elderly Male 6"),
+                    new CharacterData(id: 9013, text: "Male 7 (Young)", name: "Young Boy 7"),
+                    new CharacterData(id: 9014, text: "Male 8 (Young)", name: "Young Boy 8"),
+                    new CharacterData(id: 9015, text: "Male 9 (Young)", name: "Young Boy 9"),
+                }
+            },
+            { "Female Citizens", new List<CharacterData>()
+                {
+                    new CharacterData(id: 9004, text: "Female 1", name: "Female Citizen 1"),
+                    new CharacterData(id: 9005, text: "Female 2", name: "Female Citizen 2"),
+                    new CharacterData(id: 9006, text: "Female 3", name: "Female Citizen 3"),
+                    new CharacterData(id: 9010, text: "Female 4 (Elder)", name: "Elderly Female 4"),
+                    new CharacterData(id: 9011, text: "Female 5 (Elder)", name: "Elderly Female 5"),
+                    new CharacterData(id: 9012, text: "Female 6 (Elder)", name: "Elderly Female 6"),
+                    new CharacterData(id: 9016, text: "Female 7 (Young)", name: "Young Girl 7"),
+                    new CharacterData(id: 9017, text: "Female 8 (Young)", name: "Young Girl 8"),
+                    new CharacterData(id: 9018, text: "Female 9 (Young)", name: "Young Girl 9"),
+                }
+            }
+        };
     }
 }
