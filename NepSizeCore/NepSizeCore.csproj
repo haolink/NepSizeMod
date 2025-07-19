@@ -8,10 +8,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="webresources\assets\interop_ws.js" />
+    <None Remove="webresources\assets\rws.min.js" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="webresources\assets\applogic.js" />
     <EmbeddedResource Include="webresources\assets\bootstrap.min.css" />
     <EmbeddedResource Include="webresources\assets\character-data.js" />
-    <EmbeddedResource Include="webresources\assets\jsinterop.js" />
+    <EmbeddedResource Include="webresources\assets\interop_ws.js" />
+    <EmbeddedResource Include="webresources\assets\rws.min.js" />
     <EmbeddedResource Include="webresources\assets\style.css" />
     <EmbeddedResource Include="webresources\index.html" />
   </ItemGroup>

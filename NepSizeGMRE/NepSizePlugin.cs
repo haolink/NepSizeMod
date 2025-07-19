@@ -4,6 +4,8 @@ using System.Linq;
 using UnityEngine;
 using NepSizeCore;
 
+using BepInEx.Configuration;
+
 /// <summary>
 /// Main plugin for Game Maker.
 /// </summary>
@@ -40,11 +42,19 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
             Debug.Log("Tried to start another object of this? Unity, water u doing?");
             return;
         }
+        
+        ConfigEntry<string> listenAddress = PluginInfo.Instance.Config.Bind<string>("Server", "ListenIp", null, "IP which the web UI will listen on. Leave blank to listen on all IPs.");
+        ConfigEntry<int> listenPort = PluginInfo.Instance.Config.Bind<int>("Server", "Port", 7979, "Listen port - default is 7979");
+
+        CoreConfig.GAMENAME = "GMRE";
+        CoreConfig.SERVER_IP = listenAddress.Value;
+        CoreConfig.SERVER_PORT = listenPort.Value;
+
         _instance = this;
 
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(this, new ServerCommands("GMRE", this));
+        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);
     }
 
     /// <summary>

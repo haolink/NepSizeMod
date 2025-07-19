@@ -7,6 +7,26 @@ using System.Runtime.InteropServices;
 namespace NepSizeCore
 {
     /// <summary>
+    /// Event when the list of character is changed.
+    /// </summary>
+    public class ActiveCharactersChangedEvent : EventArgs
+    {
+        /// <summary>
+        /// Character ID list.
+        /// </summary>
+        public IList<uint> ActiveCharacters { get; private set; }
+
+        /// <summary>
+        /// Creator for the character change event.
+        /// </summary>
+        /// <param name="activeCharacters"></param>
+        public ActiveCharactersChangedEvent(IList<uint> activeCharacters)
+        {
+            this.ActiveCharacters = activeCharacters;
+        }
+    }
+
+    /// <summary>
     /// Memory manager which reserves memory in the game's main memory and pins it.
     /// It can then be written by a client.
     /// </summary>
@@ -124,6 +144,11 @@ namespace NepSizeCore
         private BinaryWriter _charListMemoryWriter;
 
         /// <summary>
+        /// Fire event when active characters differ from before.
+        /// </summary>
+        public event EventHandler<ActiveCharactersChangedEvent> ActiveCharactersChanged;
+
+        /// <summary>
         /// Private constructor.
         /// </summary>
         /// <param name="plugin">First plugin instance passed onto the Instance() getter</param>
@@ -192,12 +217,22 @@ namespace NepSizeCore
         }
 
         /// <summary>
+        /// List of active characters, cache.
+        /// </summary>
+        private List<uint> _activeCharacterCache = null;        
+
+        /// <summary>
         /// List of active characters, virtual property.
         /// </summary>
         public List<uint> ActiveCharacters
         {
             get
             {
+                if (_activeCharacterCache != null)
+                {
+                    return _activeCharacterCache;
+                }
+
                 List<uint> values = new List<uint>();
                 this._charListMemoryStream.Seek(0, SeekOrigin.Begin);
                 uint cId;
@@ -205,6 +240,10 @@ namespace NepSizeCore
                 {
                     values.Add(cId);
                 }
+
+                values.Sort();
+                _activeCharacterCache = values;
+
                 return values;
             }
         }
@@ -248,7 +287,6 @@ namespace NepSizeCore
             this._scaleListMemoryStream.Seek(0, SeekOrigin.Begin);
             foreach (KeyValuePair<uint, float> entry in entries)
             {
-                this._plugin.DebugLog("Writing " + entry.Key.ToString() + " --> " + entry.Value.ToString("F2"));
                 this._scaleListMemoryWriter.Write(entry.Key);
                 this._scaleListMemoryWriter.Write(entry.Value);
             }
@@ -266,9 +304,28 @@ namespace NepSizeCore
             if (characterIds.Count > MEM_CHARLIST_LENGTH)
             {
                 throw new Exception("Maximum storage capacity exceeded");
-            }
+            }            
             characterIds.Sort();
 
+            bool changed = false;
+            if (_activeCharacterCache == null)
+            {
+                _activeCharacterCache = characterIds;
+                changed = true;
+            }
+            if (!Enumerable.SequenceEqual(characterIds, _activeCharacterCache)) {
+                _activeCharacterCache = characterIds;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                if (ActiveCharactersChanged != null)
+                {
+                    ActiveCharactersChanged(this, new ActiveCharactersChangedEvent(_activeCharacterCache.Distinct().ToList()));
+                }
+            }
+            
             this._charListMemoryStream.Seek(0, SeekOrigin.Begin);
             foreach (uint characterId in characterIds)
             {

@@ -217,9 +217,14 @@ namespace NepSizeCore
         }
 
         /// <summary>
-        /// Main thread.
+        /// Thread for named pipes.
         /// </summary>
         private Thread _pipeThread;
+
+        /// <summary>
+        /// Web socket thread.
+        /// </summary>
+        private Thread _socketThread;
 
         /// <summary>
         /// Will be set in case the thread should be cancelled.
@@ -235,6 +240,11 @@ namespace NepSizeCore
         /// Thread queue.
         /// </summary>
         private ConcurrentQueue<ConnectionData> _mainThreadActiveConnections;
+
+        /// <summary>
+        /// Push notifications for Web Socket clients.
+        /// </summary>
+        private ConcurrentQueue<SizeServerResponse> _pushNotifications;
 
         /// <summary>
         /// Supported server commands.
@@ -257,30 +267,72 @@ namespace NepSizeCore
         private INepSizeGamePlugin _mainPlugin;
 
         /// <summary>
+        /// Size memory Storage.
+        /// </summary>
+        private SizeMemoryStorage _sizeMemoryStorage;
+
+        /// <summary>
         /// Initialises the main pipe server thread.
         /// </summary>
         /// <param name="serverCommands"></param>
-        public SizeDataThread(INepSizeGamePlugin mainPlugin, ServerCommands serverCommands)
+        public SizeDataThread(INepSizeGamePlugin mainPlugin, SizeMemoryStorage sizeMemoryStorage)
         {
-            _serverCommands = serverCommands;
+            _serverCommands = new ServerCommands(CoreConfig.GAMENAME, mainPlugin);
             _mainPlugin = mainPlugin;
+            _sizeMemoryStorage = sizeMemoryStorage;
+
+            _sizeMemoryStorage.ActiveCharactersChanged += MemoryReportsNewCharacterList;
 
             RegisterAllCommands();
 
             _pipeCancellation = new CancellationTokenSource();
             _mainThreadActiveConnections = new ConcurrentQueue<ConnectionData>();
 
-            _pipeThread = new Thread(() => {
-                InitialiseWebUI();
+            _pushNotifications = new ConcurrentQueue<SizeServerResponse>();
+
+            _pipeThread = new Thread(() => {                
                 RunServer(_pipeCancellation.Token);
             })
             {
                 IsBackground = true,
                 Priority = System.Threading.ThreadPriority.Lowest
             };
-            _pipeThread.Start();            
+            _pipeThread.Start();
+
+            _socketThread = new Thread(() =>
+            {
+                InitialiseWebUI(_pipeCancellation.Token);
+            })
+            {
+                IsBackground = true,
+                Priority = System.Threading.ThreadPriority.Lowest
+            };
+            _socketThread.Start();
 
             _serverCommands.Log("Thread started");
+        }
+
+        /// <summary>
+        /// When new characters are detected.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void MemoryReportsNewCharacterList(object sender, ActiveCharactersChangedEvent e)
+        {
+            this.PushNewCharacters(e.ActiveCharacters);
+        }
+
+        /// <summary>
+        /// Sends a push notification to all Web Socket clients with the new Character list.
+        /// </summary>
+        /// <param name="activeCharacters"></param>
+        private void PushNewCharacters(IList<uint> activeCharacters)
+        {
+            JsonElement je = JsonCompatibility.SerializeToElement(activeCharacters);
+
+            SizeServerResponse push = SizeServerResponse.CreatePushNotification("ActiveCharacterChange", "Active characters have changed", je);
+
+            _pushNotifications.Enqueue(push);
         }
         
         /// <summary>
@@ -327,12 +379,27 @@ namespace NepSizeCore
         /// <summary>
         /// Web UI shall be initialised.
         /// </summary>
-        private void InitialiseWebUI()
+        private void InitialiseWebUI(CancellationToken token)
         {
-            _webUI = new WebUI(this._mainPlugin.GetCharacterList());
+            DebugLogThreadSafe($"Starting web server - on port {CoreConfig.SERVER_PORT}, IP {CoreConfig.SERVER_IP}");
+
+            DebugLogThreadSafe("JETZT");
+            _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT);
+            DebugLogThreadSafe("HALT");
             _webUI.Log += WebUIDebugLog;
+            DebugLogThreadSafe("DEINE");
             _webUI.MessageReceived += WebUIMessageReceived;
+            DebugLogThreadSafe("FRESSE");
             _webUI.Start();
+            DebugLogThreadSafe("DU SAU");
+
+            while (!token.IsCancellationRequested)
+            {
+                while (_pushNotifications.TryDequeue(out SizeServerResponse notification))
+                {
+                    _webUI.SendPushNotification(notification);
+                }
+            }
         }
 
         /// <summary>

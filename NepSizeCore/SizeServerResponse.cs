@@ -14,7 +14,8 @@ namespace NepSizeCore
         /// </summary>
         const int MSG_TYPE_SUCCESS = 0;
         const int MSG_TYPE_ERROR = 1;
-        const int MSG_TYPE_EXCEPTION = 2;  
+        const int MSG_TYPE_EXCEPTION = 2;
+        const int MSG_TYPE_PUSH = 3;
 
         /// <summary>
         /// What type is the response.
@@ -22,9 +23,14 @@ namespace NepSizeCore
         public int Type { get; private set; }
         
         /// <summary>
+        /// Context of a push notification.
+        /// </summary>
+        public string Context { get; private set; }
+
+        /// <summary>
         /// Text of the message.
         /// </summary>
-        public string Message { get; private set; }
+        public string? Message { get; private set; }
         
         /// <summary>
         /// Transmitted data in the message.
@@ -80,6 +86,20 @@ namespace NepSizeCore
         public static SizeServerResponse ReturnException(string message, JsonElement? data = null)
         {
             return new SizeServerResponse(MSG_TYPE_EXCEPTION, message, data);
+        }
+
+        /// <summary>
+        /// Erzeugt eine Push-Notification.
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="message"></param>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static SizeServerResponse CreatePushNotification(string context, string message, JsonElement? data = null)
+        {
+            SizeServerResponse ssr = new SizeServerResponse(MSG_TYPE_PUSH, message, data);
+            ssr.Context = context;
+            return ssr;
         }
     }
 }

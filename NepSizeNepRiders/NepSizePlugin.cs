@@ -1,8 +1,9 @@
+using BepInEx.Configuration;
+using NepSizeCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using NepSizeCore;
 
 /// <summary>
 /// Main plugin for Neptunia riders.
@@ -40,11 +41,19 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
             Debug.Log("Tried to start another object of this? Unity, water u doing?");
             return;
         }
+
+        ConfigEntry<string> listenAddress = PluginInfo.Instance.Config.Bind<string>("Server", "ListenIp", null, "IP which the web UI will listen on. Leave blank to listen on all IPs.");
+        ConfigEntry<int> listenPort = PluginInfo.Instance.Config.Bind<int>("Server", "Port", 9898, "Listen port - default is 9898");
+
+        CoreConfig.GAMENAME = "NPRD";
+        CoreConfig.SERVER_IP = listenAddress.Value;
+        CoreConfig.SERVER_PORT = listenPort.Value;
+
         _instance = this;
 
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(this, new ServerCommands("NPRD", this));
+        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);
     }
 
     /// <summary>
@@ -173,6 +182,32 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
     public CharacterList GetCharacterList()
     {
-        return null;
+        return new CharacterList()
+        {
+            { "Uzume", new List<CharacterData>()
+                {
+                    new CharacterData(id: 501, text: "Rider", name: "Uzume Rider"),
+                    new CharacterData(id: 502, text: "Swimsuit", name: "Uzume Rider"),
+                    new CharacterData(id: 503, text: "Apocalyptic Costume", name: "Uzume Apocalyptic Costume"),
+                    new CharacterData(id: 504, text: "Race Queen", name: "Uzume Race Queen"),
+                }
+            },
+            { "Neptune", new List<CharacterData>()
+                {
+                    new CharacterData(id: 101, text: "Parka Rider", name: "Neptune Rider"),
+                    new CharacterData(id: 102, text: "Swimsuit", name: "Neptune Swimsuit"),
+                    new CharacterData(id: 103, text: "Apocalyptic Costume", name: "Neptune Apocalyptic Costume"),
+                    new CharacterData(id: 104, text: "Race Queen", name: "Neptune Race Queen"),
+                }
+            },
+            { "Noire", new List<CharacterData>()
+                {
+                    new CharacterData(id: 201, text: "Clear Rider", name: "Noire Rider"),
+                    new CharacterData(id: 202, text: "Swimsuit", name: "Noire Swimsuit"),
+                    new CharacterData(id: 203, text: "Apocalyptic Costume", name: "Noire Apocalyptic Costume"),
+                    new CharacterData(id: 204, text: "Race Queen", name: "Noire Race Queen"),
+                }
+            },
+        };
     }
 }

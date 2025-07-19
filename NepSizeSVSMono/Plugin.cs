@@ -23,6 +23,8 @@ public class Plugin : BaseUnityPlugin
         Logger = base.Logger;
         Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
 
+        PluginInfo.Instance = this;
+
         this.gameObject.AddComponent<NepSizePlugin>();
 
         Harmony.CreateAndPatchAll(typeof(DontPause));

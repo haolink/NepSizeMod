@@ -8,8 +8,8 @@ String.prototype.toHtmlEntities = function () {
     });
 };
 
-let debugMode = false; //Is debug mode on
 let activeCharacterIds = []; //Who are the active characters
+let listPopulated = false;
 
 /**
  * Updates the character highlights (blue) based on the list of active characters.
@@ -31,30 +31,33 @@ function updateHighlitCharacters() {
 /**
  * We received a new player list.
  */
-window.interop.registerCommand("UpdatePlayerList", function (data) {
-    activeCharacterIds = data.characterIds;
+window.interop.registerEvent("ActiveCharacterChange", function (data) {
+    setActiveCharacters(data);
+});
+
+/**
+ * Handles the list active characters.
+ * @param {any} ids
+ */
+function setActiveCharacters(ids) {
+	activeCharacterIds = ids;
 
     displayDebugActiveCharacters();
 
     updateHighlitCharacters();
-});
+}
 
-
-let lastGame = null; //Game ID
 
 /**
  * Displaying some debug data.
  */
 function displayDebugActiveCharacters() {
-    let allIds = null;
-    if (lastGame in gameCharacters) {
-        allIds = [];
-        Object.entries(gameCharacters[lastGame]).forEach(([group, characters]) => {
-            Object.entries(characters).forEach(([i, characterData]) => {
-                allIds[characterData.id] = characterData.name;
-            });
-        });        
-    }
+	allIds = [];
+	Object.entries(characterData).forEach(([group, characters]) => {
+		Object.entries(characters).forEach(([i, characterData]) => {
+			allIds[characterData.id] = characterData.name;
+		});
+	});        
 
     let actList = [];
     activeCharacterIds.forEach((id) => {
@@ -74,41 +77,47 @@ function displayDebugActiveCharacters() {
 /**
  * Game has connected.
  */
-window.interop.registerCommand("GameConnected", function (data) {
+window.interop.registerEvent("GameConnected", function () {
     document.querySelector("#character-id").removeAttribute("disabled");
     document.querySelector("#btn-add-all").removeAttribute("disabled");
     document.querySelector("#btn-add-character").removeAttribute("disabled");
     document.querySelector("#btn-persist").removeAttribute("disabled");
     document.querySelector("#btn-unpersist").removeAttribute("disabled");
 
-    const newGame = data.game; //Is it another one? Reset the UI and repopulate the selections.
-    if (newGame != lastGame) {
-        clearChars();
-        lastGame = newGame;
-        if (newGame in gameCharacters) {
-            populateMenu(gameCharacters[newGame]);
+	if (!listPopulated) {
+		clearChars();
+		populateMenu(characterData);
 
-            Object.entries(data.currentScales).forEach(([id, scale]) => {
-                addCharacterScale(id, scale);
-            });
-            updateHighlitCharacters();
-            updateScales();
-        }        
-    } else { //Otherwise enable the fields.
-        document.querySelectorAll('input[type=text][data-char-id]').forEach((e) => {
-            e.removeAttribute("disabled");
-        });
-        document.querySelectorAll('button.btn-remove-char').forEach((e) => {
-            e.removeAttribute("disabled");
-        });
-        updateScales(); //And send the scales
-    }
+		updateHighlitCharacters();
+		
+		window.interop.sendCommand("GetCurrentScales", {}, (reply) => {
+			reply.Data.scales.forEach((entry) => {
+				addCharacterScale(entry.id, entry.scale);
+			});
+			
+			updateHighlitCharacters();
+			updateScales();
+		});
+	} else {
+		updateScales();
+	}
+
+	document.querySelectorAll('input[type=text][data-char-id]').forEach((e) => {
+		e.removeAttribute("disabled");
+	});
+	document.querySelectorAll('button.btn-remove-char').forEach((e) => {
+		e.removeAttribute("disabled");
+	});    
+	
+	window.interop.sendCommand("GetActiveCharacterIds", {}, (reply) => {
+		setActiveCharacters(reply.Data.ids);
+	});
 });
 
 /**
  * Game disconnected - disable the inputs.
  */
-window.interop.registerCommand("GameDisconnected", function (data) {
+window.interop.registerEvent("GameDisconnected", function (data) {
     document.querySelector("#character-id").setAttribute("disabled", "disabled");
     document.querySelector("#btn-add-all").setAttribute("disabled", "disabled");
     document.querySelector("#btn-add-character").setAttribute("disabled", "disabled");
@@ -149,6 +158,12 @@ function resetSelectList() {
 window.addEventListener("DOMContentLoaded", () => {
     const select = document.querySelector("#character-id");
 
+    if (window.debugMode) {
+        document.querySelectorAll('.debug-hide').forEach((e) => {
+            e.classList.remove('debug-hide');
+        });
+    }
+
     ["change", "blur"].forEach(event => {
         select.addEventListener(event, () => {
             updateSelectList();
@@ -156,7 +171,9 @@ window.addEventListener("DOMContentLoaded", () => {
     });
     select.addEventListener("pointerdown", () => {
         resetSelectList();
-    });    
+    });
+	
+	window.interop.start();
 });
 
 /**
@@ -178,6 +195,7 @@ function populateMenu(characters) {
     });
 
     select.innerHTML = html;
+	listPopulated = true;
 
     updateSelectList();
 };
@@ -208,7 +226,10 @@ function parseLocaleNumber(stringNumber) {
  * @param {any} scales
  */
 function sendScales(scales) {
-    window.interop.sendToHostApp("updateScales", { "scales": scales });
+	const scaleArray = new Array();
+	Object.entries(scales).forEach(([id, scale]) => scaleArray.push({ id: parseInt(id), scale: scale }));
+	const payload = { "scales": scaleArray, "overwride": true };
+    window.interop.sendCommand("SetScales", payload, (e) => {  });
 }
 
 /**
@@ -279,11 +300,7 @@ function addCharacterByNameAndId(characterName, characterId, scale) {
 function addAllActive() {
     let activeKnown = [];
 
-    if (lastGame == null || !(lastGame in gameCharacters)) {
-        return false;
-    }
-
-    Object.entries(gameCharacters[lastGame]).forEach(([group, characters]) => {
+    Object.entries(characterData).forEach(([group, characters]) => {
         Object.entries(characters).forEach(([i, characterData]) => {
             if (activeCharacterIds.includes(parseInt(characterData.id))) {
                 activeKnown.push({
@@ -393,21 +410,11 @@ function toggleEmptyLine() {
 }
 
 /**
- * Debug on/off.
- */
-window.interop.registerCommand("EnableDebug", () => {
-    debugMode = true;
-    document.querySelectorAll('.debug-hide').forEach((e) => {
-        e.classList.remove('debug-hide');
-    });
-});
-
-/**
  * Persist scales in game.
  * @returns
  */
 function persist() {
-    window.interop.sendToHostApp("persistScales");
+    window.interop.sendCommand("UpdatePersistence", { clear: false }, (e) => { console.log(e); });
     return false;
 }
 
@@ -416,13 +423,6 @@ function persist() {
  * @returns
  */
 function unpersist() {
-    window.interop.sendToHostApp("clearPersistance");
+    window.interop.sendCommand("UpdatePersistence", { clear: true }, (e) => { console.log(e); });
     return false;
 }
-
-/**
- * Persistence callback.
- */
-window.interop.registerCommand("ConfirmPersistenceUpdate", function (success) {
-    alert((success) ? "Saved" : "Something went wrong.");
-});

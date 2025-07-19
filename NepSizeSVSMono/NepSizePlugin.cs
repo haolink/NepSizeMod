@@ -1,10 +1,11 @@
+using BepInEx.Configuration;
+using NepSizeCore;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
-using NepSizeCore;
 
 /// <summary>
 /// Main plugin for Sisters vs Sisters.
@@ -44,9 +45,16 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         }
         _instance = this;
 
+        ConfigEntry<string> listenAddress = PluginInfo.Instance.Config.Bind<string>("Server", "ListenIp", null, "IP which the web UI will listen on. Leave blank to listen on all IPs.");
+        ConfigEntry<int> listenPort = PluginInfo.Instance.Config.Bind<int>("Server", "Port", 8989, "Listen port - default is 8989");
+
+        CoreConfig.GAMENAME = "NSVS";
+        CoreConfig.SERVER_IP = listenAddress.Value;
+        CoreConfig.SERVER_PORT = listenPort.Value;
+
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(this, new ServerCommands("NSVS", this));
+        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);
     }
 
     /// <summary>
@@ -142,6 +150,105 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
     public CharacterList GetCharacterList()
     {
-        return null;
+        return new CharacterList()
+        {
+            { "Nepgear", new List<CharacterData>()
+                {
+                    new CharacterData(id: 500, text: "Default Outfit", name: "Nepgear"),
+                    new CharacterData(id: 510, text: "Purple Sister", name: "Purple Sister"),
+                    new CharacterData(id: 550, text: "Swimsuit Outfit", name: "Nepgear (Swimsuit)"),
+                }
+            },
+            { "Uni", new List<CharacterData>()
+                {
+                    new CharacterData(id: 600, text: "Default Outfit", name: "Uni"),
+                    new CharacterData(id: 610, text: "Black Sister", name: "Black Sister"),
+                    new CharacterData(id: 650, text: "Swimsuit Outfit", name: "Uni (Swimsuit)"),
+                }
+            },
+            { "Rom", new List<CharacterData>()
+                {
+                    new CharacterData(id: 700, text: "Default Outfit", name: "Rom"),
+                    new CharacterData(id: 710, text: "White Sister", name: "White Sister Rom"),
+                    new CharacterData(id: 750, text: "Swimsuit Outfit", name: "Rom (Swimsuit)"),
+                }
+            },
+            { "Ram", new List<CharacterData>()
+                {
+                    new CharacterData(id: 800, text: "Default Outfit", name: "Ram"),
+                    new CharacterData(id: 810, text: "White Sister", name: "White Sister Ram"),
+                    new CharacterData(id: 850, text: "Swimsuit Outfit", name: "Ram (Swimsuit)"),
+                }
+            },
+            { "Neptune", new List<CharacterData>()
+                {
+                    new CharacterData(id: 100, text: "Default Outfit", name: "Neptune"),
+                    new CharacterData(id: 110, text: "Purple Heart", name: "Purple Heart"),
+                    new CharacterData(id: 150, text: "Swimsuit Outfit", name: "Neptune (Swimsuit)"),
+                }
+            },
+            { "Noire", new List<CharacterData>()
+                {
+                    new CharacterData(id: 200, text: "Default Outfit", name: "Noire"),
+                    new CharacterData(id: 210, text: "Black Heart", name: "Black Heart"),
+                    new CharacterData(id: 250, text: "Swimsuit Outfit", name: "Noire (Swimsuit)"),
+                }
+            },
+            { "Blanc", new List<CharacterData>()
+                {
+                    new CharacterData(id: 300, text: "Default Outfit", name: "Blanc"),
+                    new CharacterData(id: 310, text: "White Heart", name: "White Heart"),
+                    new CharacterData(id: 350, text: "Swimsuit Outfit", name: "Blanc (Swimsuit)"),
+                }
+            },
+            { "Vert", new List<CharacterData>()
+                {
+                    new CharacterData(id: 400, text: "Default Outfit", name: "Vert"),
+                    new CharacterData(id: 410, text: "Green Heart", name: "Green Heart"),
+                    new CharacterData(id: 450, text: "Swimsuit Outfit", name: "Vert (Swimsuit)"),
+                }
+            },
+            { "Friends", new List<CharacterData>()
+                {
+                    new CharacterData(id: 5504, text: "Maho", name: "Maho"),
+                    new CharacterData(id: 5505, text: "Grey Sister", name: "Grey Sister"),
+                    new CharacterData(id: 5516, text: "Anri", name: "Anri"),
+                    new CharacterData(id: 3000, text: "Shanghai Alice", name: "Shanghai Alice"),
+                    new CharacterData(id: 3100, text: "Higurashi", name: "Higurashi"),
+                }
+            },
+            { "Antagonists", new List<CharacterData>()
+                {
+                    new CharacterData(id: 5503, text: "Arfoire", name: "Arfoire"),
+                }
+            },
+            { "Male Citizens", new List<CharacterData>()
+                {
+                    new CharacterData(id: 9001, text: "Male 1", name: "Male Citizen 1"),
+                    new CharacterData(id: 9002, text: "Male 2", name: "Male Citizen 2"),
+                    new CharacterData(id: 9003, text: "Male 3", name: "Male Citizen 3"),
+                    new CharacterData(id: 9007, text: "Male 4 (Elder)", name: "Elderly Male 4"),
+                    new CharacterData(id: 9008, text: "Male 5 (Elder)", name: "Elderly Male 5"),
+                    new CharacterData(id: 9009, text: "Male 6 (Elder)", name: "Elderly Male 6"),
+                    new CharacterData(id: 9013, text: "Male 7 (Young)", name: "Young Boy 7"),
+                    new CharacterData(id: 9014, text: "Male 8 (Young)", name: "Young Boy 8"),
+                    new CharacterData(id: 9015, text: "Male 9 (Young)", name: "Young Boy 9"),
+                }
+            },
+            { "Female Citizens", new List<CharacterData>()
+                {
+                    new CharacterData(id: 9004, text: "Female 1", name: "Female Citizen 1"),
+                    new CharacterData(id: 9005, text: "Female 2", name: "Female Citizen 2"),
+                    new CharacterData(id: 9006, text: "Female 3", name: "Female Citizen 3"),
+                    new CharacterData(id: 9010, text: "Female 4 (Elder)", name: "Elderly Female 4"),
+                    new CharacterData(id: 9011, text: "Female 5 (Elder)", name: "Elderly Female 5"),
+                    new CharacterData(id: 9012, text: "Female 6 (Elder)", name: "Elderly Female 6"),
+                    new CharacterData(id: 9016, text: "Female 7 (Young)", name: "Young Girl 7"),
+                    new CharacterData(id: 9017, text: "Female 8 (Young)", name: "Young Girl 8"),
+                    new CharacterData(id: 9018, text: "Female 9 (Young)", name: "Young Girl 9"),
+                    new CharacterData(id: 9000, text: "Vert", name: "Vert (Citizen)"),
+                }
+            }
+        };
     }
 }

@@ -135,7 +135,7 @@ namespace NepSizeCore
         /// <param name="port"></param>
         public WebUI(CharacterList characterList, string ipString = null, int port = 7979)
         {
-            if (ipString == null)
+            if (String.IsNullOrEmpty(ipString))
             {
                 _server = new HttpServer(address: IPAddress.Any, port: port);
             }
@@ -149,7 +149,8 @@ namespace NepSizeCore
 
             this._specialPaths = new Dictionary<string, Func<string>>()
             {
-                [this._rootNamespace + ".webresources.virtual.characters.js"] = new Func<string>(() => this.GenerateVirtualCharacterList())
+                [this._rootNamespace + ".webresources.virtual.characters.js"] = new Func<string>(() => this.GenerateVirtualCharacterList()),
+                [this._rootNamespace + ".webresources.virtual.sysconst.js"] = new Func<string>(() => this.GenerateConstants())
             };
 
             List<string> validResources = new List<string>();
@@ -183,11 +184,23 @@ namespace NepSizeCore
         }
 
         /// <summary>
+        /// Sends a push notification to all users.
+        /// </summary>
+        /// <param name="response"></param>
+        public void SendPushNotification(SizeServerResponse response)
+        {
+            string json = JsonSerializer.Serialize(response);
+            this._server.WebSocketServices["/socket"].Sessions.BroadcastAsync(json, null);
+        }
+
+        /// <summary>
         /// Start the server.
         /// </summary>
         public void Start()
         {
+            DebugLog("Starting Server....");
             _server.Start();
+            DebugLog("Started!");
         }
 
         /// <summary>
@@ -280,6 +293,10 @@ namespace NepSizeCore
         /// </summary>
         private string _characterJson = null;
 
+        /// <summary>
+        /// Generate the virtual character list.
+        /// </summary>
+        /// <returns></returns>
         private string GenerateVirtualCharacterList()
         {
             if (_characterJson == null)
@@ -292,6 +309,23 @@ namespace NepSizeCore
             }
 
             return _characterJson;
+        }
+
+        /// <summary>
+        /// Generate JS constants.
+        /// </summary>
+        /// <returns></returns>
+        private string GenerateConstants()
+        {
+            string consts = "";
+
+#if DEBUG
+            consts += "window.debugMode = true;";
+#else
+            consts += "const debugMode = false;";
+#endif
+
+            return consts;
         }
 
         /// <summary>
