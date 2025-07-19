@@ -44,10 +44,12 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
         ConfigEntry<string> listenAddress = PluginInfo.Instance.Config.Bind<string>("Server", "ListenIp", null, "IP which the web UI will listen on. Leave blank to listen on all IPs.");
         ConfigEntry<int> listenPort = PluginInfo.Instance.Config.Bind<int>("Server", "Port", 9898, "Listen port - default is 9898");
+        ConfigEntry<bool> listenSubnetOnly = PluginInfo.Instance.Config.Bind<bool>("Server", "RestrictListenSubnet", true, "Only listen in the local IPv4 subnet, disable this if you wish to allow global access (you must know what you're doing!).");
 
         CoreConfig.GAMENAME = "NPRD";
         CoreConfig.SERVER_IP = listenAddress.Value;
         CoreConfig.SERVER_PORT = listenPort.Value;
+        CoreConfig.SERVER_LOCAL_SUBNET_ONLY = listenSubnetOnly.Value;
 
         _instance = this;
 

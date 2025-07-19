@@ -11,5 +11,7 @@ namespace NepSizeCore
         public static string SERVER_IP;
 
         public static int SERVER_PORT;
+
+        public static bool SERVER_LOCAL_SUBNET_ONLY = true;
     }
 }

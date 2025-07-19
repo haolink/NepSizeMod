@@ -383,15 +383,10 @@ namespace NepSizeCore
         {
             DebugLogThreadSafe($"Starting web server - on port {CoreConfig.SERVER_PORT}, IP {CoreConfig.SERVER_IP}");
 
-            DebugLogThreadSafe("JETZT");
-            _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT);
-            DebugLogThreadSafe("HALT");
+            _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT, filterLocalSubnetOnly: CoreConfig.SERVER_LOCAL_SUBNET_ONLY);
             _webUI.Log += WebUIDebugLog;
-            DebugLogThreadSafe("DEINE");
             _webUI.MessageReceived += WebUIMessageReceived;
-            DebugLogThreadSafe("FRESSE");
             _webUI.Start();
-            DebugLogThreadSafe("DU SAU");
 
             while (!token.IsCancellationRequested)
             {

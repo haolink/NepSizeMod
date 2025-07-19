@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Text.Encodings.Web;
@@ -28,7 +30,7 @@ namespace NepSizeCore
         /// <param name="message"></param>
         public LogEvent(string message) : base()
         {
-            this.Message = message;            
+            this.Message = message;
         }
     }
 
@@ -72,8 +74,8 @@ namespace NepSizeCore
 
         private Action<string, WebUIJsonHandler> _delegate = null;
 
-        public Action<string, WebUIJsonHandler> Delegate 
-        { 
+        public Action<string, WebUIJsonHandler> Delegate
+        {
             get { return _delegate; }
             set { _delegate = value; }
         }
@@ -91,7 +93,7 @@ namespace NepSizeCore
     /// Manager for a web ui for a size plugin.
     /// </summary>
     public class WebUI
-    {        
+    {
         /// <summary>
         /// Server component.
         /// </summary>
@@ -128,12 +130,17 @@ namespace NepSizeCore
         private string[] _resourceCache;
 
         /// <summary>
+        /// 
+        /// </summary>
+        private List<(IPAddress IP, IPAddress Subnet)> _localSubnets;
+
+        /// <summary>
         /// Constructor.
         /// </summary>
         /// <param name="characterList"></param>
         /// <param name="ipString"></param>
         /// <param name="port"></param>
-        public WebUI(CharacterList characterList, string ipString = null, int port = 7979)
+        public WebUI(CharacterList characterList, string ipString = null, int port = 7979, bool filterLocalSubnetOnly = true)
         {
             if (String.IsNullOrEmpty(ipString))
             {
@@ -154,7 +161,7 @@ namespace NepSizeCore
             };
 
             List<string> validResources = new List<string>();
-            foreach(string resourceName in Assembly.GetExecutingAssembly().GetManifestResourceNames())
+            foreach (string resourceName in Assembly.GetExecutingAssembly().GetManifestResourceNames())
             {
                 if (resourceName.StartsWith(this._rootNamespace + "."))
                 {
@@ -163,11 +170,18 @@ namespace NepSizeCore
             }
             this._resourceCache = validResources.ToArray();
 
+            if (filterLocalSubnetOnly)
+            {
+                _server.OnFilter += ServerOnFilter;
+            }
+            
             _server.OnGet += ServerOnGet;
             _server.AddWebSocketService<WebUIJsonHandler>("/socket", (s) => s.Delegate = (s, e) =>
             {
                 this.ReceivedMessageFromSocket(s, e);
             });
+
+            _localSubnets = GetLocalIPSubnets();
         }
 
         /// <summary>
@@ -194,13 +208,60 @@ namespace NepSizeCore
         }
 
         /// <summary>
+        /// Check if a request should be filtered.
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        internal void ServerOnFilter(object sender, HttpRequestFilter e)
+        {
+            IPAddress source = e.Request.RemoteEndPoint.Address;
+
+            bool inSubnet = false;
+            foreach ((IPAddress ip, IPAddress subnet) in this._localSubnets)
+            {
+                if (IsInSameSubnet(source, ip, subnet))
+                {
+                    inSubnet = true;
+                    break;
+                }
+            }
+
+            e.Cancel = !inSubnet;
+        }
+
+        /// <summary>
+        /// Is this in an internal subnet.
+        /// </summary>
+        /// <param name="ip"></param>
+        /// <param name="subnetAddress"></param>
+        /// <param name="subnetMask"></param>
+        /// <returns></returns>
+        private static bool IsInSameSubnet(IPAddress ip, IPAddress subnetAddress, IPAddress subnetMask)
+        {
+            byte[] ipBytes = ip.GetAddressBytes();
+            byte[] subnetBytes = subnetAddress.GetAddressBytes();
+            byte[] maskBytes = subnetMask.GetAddressBytes();
+
+            if (ipBytes.Length != subnetBytes.Length || ipBytes.Length != maskBytes.Length)
+                return false;
+
+            for (int i = 0; i < ipBytes.Length; i++)
+            {
+                if ((ipBytes[i] & maskBytes[i]) != (subnetBytes[i] & maskBytes[i]))
+                {
+                    return false;
+                }                    
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Start the server.
         /// </summary>
         public void Start()
         {
-            DebugLog("Starting Server....");
             _server.Start();
-            DebugLog("Started!");
         }
 
         /// <summary>
@@ -387,16 +448,16 @@ namespace NepSizeCore
                 uri += "index.html";
             }
 
-            uri = uri.Replace("/", ".");            
+            uri = uri.Replace("/", ".");
 
-            
+
 
             string resourceUrl = $"{_rootNamespace}.webresources{uri}";
 
             if (IsResourceValid(resourceUrl))
             {
                 return resourceUrl;
-            }            
+            }
             else
             {
                 resourceUrl += ".index.html";
@@ -423,8 +484,8 @@ namespace NepSizeCore
                 data = this.QueryResourceContent(resourceName);
             }
 
-            if (data == null) 
-            { 
+            if (data == null)
+            {
                 data = Encoding.UTF8.GetBytes("Not found");
                 e.Response.ContentLength64 = data.Length;
                 e.Response.ContentType = "text/plain; charset=utf-8";
@@ -440,5 +501,30 @@ namespace NepSizeCore
             e.Response.ContentType = contentType;
             e.Response.OutputStream.Write(data, 0, data.Length);
         }
+
+        /// <summary>
+        /// Get all active subnets.
+        /// </summary>
+        /// <returns></returns>
+        private static List<(IPAddress IP, IPAddress Subnet)> GetLocalIPSubnets()
+        {
+            var result = new List<(IPAddress, IPAddress)>();
+
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                    continue;
+
+                foreach (var ua in ni.GetIPProperties().UnicastAddresses)
+                {
+                    if (ua.Address.AddressFamily != AddressFamily.InterNetwork)
+                        continue;
+
+                    result.Add((ua.Address, ua.IPv4Mask));
+                }
+            }
+
+            return result;
+        }
     }
-}
+}   

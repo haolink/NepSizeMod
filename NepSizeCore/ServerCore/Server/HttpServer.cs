@@ -750,6 +750,11 @@ namespace WebSocketSharp.Server
     /// </summary>
     public event EventHandler<HttpRequestEventArgs> OnTrace;
 
+    /// <summary>
+    /// Will be fired on the initial run of a request processing - can be used to cancel the request.
+    /// </summary>
+    public event EventHandler<HttpRequestFilter> OnFilter;
+
     #endregion
 
     #region Private Methods
@@ -852,6 +857,18 @@ namespace WebSocketSharp.Server
 
     private void processRequest (HttpListenerContext context)
     {
+      if (OnFilter != null)
+      {
+          HttpRequestFilter filterEventArgs = new HttpRequestFilter(context, _docRootPath);
+          OnFilter(this, filterEventArgs);
+
+          if (filterEventArgs.Cancel)
+          {
+             context.Connection.Close(true);
+             return;
+          }
+      }
+            
       var method = context.Request.HttpMethod;
       var evt = method == "GET"
                 ? OnGet
@@ -886,8 +903,20 @@ namespace WebSocketSharp.Server
       context.Response.Close ();
     }
 
-    private void processRequest (HttpListenerWebSocketContext context)
+    private void processRequest (HttpListenerWebSocketContext context, HttpListenerContext originalContext)
     {
+      if (OnFilter != null)
+      {
+        HttpRequestFilter filterEventArgs = new HttpRequestFilter(originalContext, _docRootPath);
+        OnFilter(this, filterEventArgs);
+
+        if (filterEventArgs.Cancel)
+        {
+            originalContext.Connection.Close(true);
+            return;
+        }
+      }
+
       var uri = context.RequestUri;
 
       if (uri == null) {
@@ -924,7 +953,7 @@ namespace WebSocketSharp.Server
             state => {
               try {
                 if (ctx.Request.IsUpgradeRequest ("websocket")) {
-                  processRequest (ctx.GetWebSocketContext (null));
+                  processRequest (ctx.GetWebSocketContext (null), ctx);
 
                   return;
                 }
