@@ -170,16 +170,16 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
             },
             { "Jagga", new List<CharacterData>()
                 {
-                    new CharacterData(id: 1600, text: "Default Outfit", name: "Jagga"),
-                    new CharacterData(id: 1610, text: "Goddess Form", name: "Jagga (Goddess Form)"),
-                    new CharacterData(id: 1660, text: "Swimsuit Outfit", name: "Jagga (Swimsuit)"),
+                    new CharacterData(id: 1700, text: "Default Outfit", name: "Jagga"),
+                    new CharacterData(id: 1710, text: "Goddess Form", name: "Jagga (Goddess Form)"),
+                    new CharacterData(id: 1760, text: "Swimsuit Outfit", name: "Jagga (Swimsuit)"),
                 }
             },
             { "Reedio", new List<CharacterData>()
                 {
-                    new CharacterData(id: 1700, text: "Default Outfit", name: "Reedio"),
-                    new CharacterData(id: 1710, text: "Goddess Form", name: "Reedio (Goddess Form)"),
-                    new CharacterData(id: 1760, text: "Swimsuit Outfit", name: "Reedio (Swimsuit)"),
+                    new CharacterData(id: 1800, text: "Default Outfit", name: "Reedio"),
+                    new CharacterData(id: 1810, text: "Goddess Form", name: "Reedio (Goddess Form)"),
+                    new CharacterData(id: 1860, text: "Swimsuit Outfit", name: "Reedio (Swimsuit)"),
                 }
             },
             { "Neptune", new List<CharacterData>()

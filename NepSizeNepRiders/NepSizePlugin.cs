@@ -209,6 +209,27 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                     new CharacterData(id: 203, text: "Apocalyptic Costume", name: "Noire Apocalyptic Costume"),
                     new CharacterData(id: 204, text: "Race Queen", name: "Noire Race Queen"),
                 }
+            },            
+            { "Blanc", new List<CharacterData>()
+                {
+                    new CharacterData(id: 301, text: "White Rider", name: "Blanc Rider"),
+                    new CharacterData(id: 302, text: "Swimsuit", name: "Blanc Swimsuit"),
+                    new CharacterData(id: 303, text: "Apocalyptic Costume", name: "Blanc Apocalyptic Costume"),
+                    new CharacterData(id: 304, text: "Race Queen", name: "Blanc Race Queen"),
+                }
+            },
+            { "Vert", new List<CharacterData>()
+                {
+                    new CharacterData(id: 401, text: "Princess Rider", name: "Vert Rider"),
+                    new CharacterData(id: 402, text: "Swimsuit", name: "Vert Swimsuit"),
+                    new CharacterData(id: 403, text: "Apocalyptic Costume", name: "Vert Apocalyptic Costume"),
+                    new CharacterData(id: 404, text: "Race Queen", name: "Vert Race Queen"),
+                }
+            },
+            { "Adult Neptune", new List<CharacterData>()
+                {
+                    new CharacterData(id: 1500, text: "Sailor Dress", name: "Adult Neptune")                    
+                }
             },
         };
     }
