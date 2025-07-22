@@ -1,10 +1,12 @@
+using BepInEx.Configuration;
+using CharaIK;
+using NepSizeCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
-using NepSizeCore;
-
-using BepInEx.Configuration;
+using static System.Net.WebRequestMethods;
 
 /// <summary>
 /// Main plugin for Game Maker.
@@ -48,6 +50,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         ConfigEntry<bool> listenSubnetOnly = PluginInfo.Instance.Config.Bind<bool>("Server", "RestrictListenSubnet", true, "Only listen in the local IPv4 subnet, disable this if you wish to allow global access (you must know what you're doing!).");
 
         CoreConfig.GAMENAME = "GMRE";
+        CoreConfig.WEBUI_TITLE = "Nep GMR:E Size mod";
         CoreConfig.SERVER_IP = listenAddress.Value;
         CoreConfig.SERVER_PORT = listenPort.Value;
         CoreConfig.SERVER_LOCAL_SUBNET_ONLY = listenSubnetOnly.Value;
@@ -105,6 +108,17 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     }
 
     /// <summary>
+    /// Foot IK offsets.
+    /// </summary>
+    private Dictionary<uint, (float, float)> _footIKOffsets = new Dictionary<uint, (float, float)>();
+
+    private float ReadFootLiftupLimit(FootIK footIK)
+    {
+        FieldInfo fi = typeof(FootIK).GetField("footLiftupLimit_", BindingFlags.NonPublic | BindingFlags.Instance);
+        return (float)(fi.GetValue(footIK));
+    }
+
+    /// <summary>
     /// Update: read active characters and set their scales.
     /// </summary>
     private void Update()
@@ -132,6 +146,18 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                     if (om != null && om.transform.localPosition.x != s)
                     {
                         om.transform.localScale = new Vector3(s, s, s);
+                    }
+
+                    FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
+                    if (footIK != null)
+                    {
+                        if (!_footIKOffsets.ContainsKey(mdlId))
+                        {
+                            _footIKOffsets.Add(mdlId, (footIK.putOffset_.y, ReadFootLiftupLimit(footIK)));
+                        }
+                        (float fPut, float fUp) = _footIKOffsets[mdlId];
+                        footIK.putOffset_ = new Vector3(footIK.putOffset_.x, s * fPut, footIK.putOffset_.z);
+                        footIK.SetFootLiftupLimit(s * fUp);
                     }
                 }
             }

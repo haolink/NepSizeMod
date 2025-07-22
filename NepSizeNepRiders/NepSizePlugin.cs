@@ -1,4 +1,5 @@
 using BepInEx.Configuration;
+using CharaIK;
 using NepSizeCore;
 using System;
 using System.Collections.Generic;
@@ -127,6 +128,11 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     }
 
     /// <summary>
+    /// Foot IK offsets.
+    /// </summary>
+    private Dictionary<uint, float> _footIKOffsets = new Dictionary<uint, float>();
+
+    /// <summary>
     /// Update: read active characters and set their scales.
     /// </summary>
     private void Update()
@@ -164,6 +170,16 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                             // Not on vehicle
                             om.transform.localScale = new Vector3(s, s, s);
                         }                        
+                    }
+
+                    FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
+                    if (footIK != null)
+                    {
+                        if (!_footIKOffsets.ContainsKey(mdlId))
+                        {
+                            _footIKOffsets.Add(mdlId, footIK.put_offset_.y);
+                        }
+                        footIK.put_offset_ = new Vector3(footIK.put_offset_.x, s * _footIKOffsets[mdlId], footIK.put_offset_.z);
                     }
                 }
             }

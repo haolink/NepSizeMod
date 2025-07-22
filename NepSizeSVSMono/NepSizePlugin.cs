@@ -1,9 +1,11 @@
 using BepInEx.Configuration;
+using CharaIK;
 using NepSizeCore;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -105,6 +107,17 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     }
 
     /// <summary>
+    /// Foot IK offsets.
+    /// </summary>
+    private Dictionary<uint, (float, float)> _footIKOffsets = new Dictionary<uint, (float, float)>();
+
+    private float ReadFootLiftupLimit(FootIK footIK)
+    {
+        FieldInfo fi = typeof(FootIK).GetField("footLiftupLimit_", BindingFlags.NonPublic | BindingFlags.Instance);
+        return (float)(fi.GetValue(footIK));
+    }
+
+    /// <summary>
     /// Update: read active characters and set their scales.
     /// </summary>
     private void Update()
@@ -133,9 +146,24 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                     {
                         om.transform.localScale = new Vector3(s, s, s);
                     }
+
+                    FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
+                    if (footIK != null)
+                    {
+                        if (!_footIKOffsets.ContainsKey(mdlId))
+                        {
+                            _footIKOffsets.Add(mdlId, (footIK.putOffset_.y, ReadFootLiftupLimit(footIK)));
+                        }
+
+                        (float fPut, float fUp) = _footIKOffsets[mdlId];
+                        footIK.putOffset_ = new Vector3(footIK.putOffset_.x, s * fPut, footIK.putOffset_.z);
+                        footIK.SetFootLiftupLimit(s * fUp);
+                    }
                 }
             }
         }
+
+        //DungeonCamera dg = new DungeonCamera();        
 
         // Store the character ID into memory.
         this._sizeMemoryStorage.UpdateCharacterList(activeCharacters);

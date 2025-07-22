@@ -421,3 +421,8 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
+PackRelease/*
+!PackRelease/*.cmd
+!PackRelease/*/
+PackRelease/*/*
+!PackRelease/*/.gitkeep

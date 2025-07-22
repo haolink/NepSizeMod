@@ -6,7 +6,7 @@ public static class PluginInfo
 {
     public const string PLUGIN_GUID = "NepSize";
     public const string PLUGIN_NAME = "NepSize";
-    public const string PLUGIN_VERSION = "0.0.0.1";
+    public const string PLUGIN_VERSION = "0.0.0.2";
 
     public static Plugin Instance;
     public static string AssetsFolder = Paths.PluginPath + "\\" + PluginInfo.PLUGIN_GUID + "\\Assets";
@@ -27,6 +27,6 @@ public class Plugin : BaseUnityPlugin
 
         this.gameObject.AddComponent<NepSizePlugin>();
 
-        Harmony.CreateAndPatchAll(typeof(DontPause));
+        //Harmony.CreateAndPatchAll(typeof(DontPause));
     }
 }

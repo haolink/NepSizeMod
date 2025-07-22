@@ -156,6 +156,10 @@ function resetSelectList() {
  * We're ready, set up the select field.
  */
 window.addEventListener("DOMContentLoaded", () => {
+    if ('siteTitle' in window) {
+        document.title = window.siteTitle;
+    }
+
     const select = document.querySelector("#character-id");
 
     if (window.debugMode) {
@@ -206,19 +210,55 @@ function populateMenu(characters) {
  * @returns
  */
 function parseLocaleNumber(stringNumber) {
-    const example = Intl.NumberFormat(undefined).format(1.1);
-    const decimalSeparator = example.replace(/\d/g, '');
+    const decimalSeparator = window.userDecimalSeparator || '.';
 
-    // Baue Regex dynamisch
+    // Build dynamic RegEx
     const regex = new RegExp(`^-?\\d+(\\${decimalSeparator}(\\d+)?)?$`);
 
     if (!regex.test(stringNumber.trim())) {
         return NaN;
     }
 
-    // Wandelt Trenner in Punkt, damit JS parsen kann
+    // Converts decimal separator to dot
     const normalized = stringNumber.replace(decimalSeparator, '.');
     return Number(normalized);
+}
+
+/**
+ * Formats a number using the locale decimal separator.
+ * @param {any} number
+ * @returns
+ */
+function formatLocaleNumber(num) {
+    const decimalSeparator = window.userDecimalSeparator || '.';
+
+    if (!Number.isFinite(num)) {
+        return '';
+    }
+
+    // Numbers above 1 - display 1 decimal digit unless that one's 0.
+    if (Math.abs(num) >= 1) {
+        const rounded = Math.round(num * 10) / 10;
+        const [intPart, fracPart] = rounded.toString().split('.');
+
+        if (fracPart && fracPart !== '0') {
+            return `${intPart}${decimalSeparator}${fracPart}`;
+        } else {
+            return intPart;
+        }
+    }
+
+    // Numbers below 0: 2 significant digits.
+    const significant = num.toPrecision(2);
+    const asFloat = parseFloat(significant);
+    const str = asFloat.toString();
+
+    const [intPart, fracPart] = str.split('.');
+    if (fracPart) {
+        return `${intPart}${decimalSeparator}${fracPart}`;
+    } else {
+        return intPart;
+    }
 }
 
 /**
@@ -283,7 +323,7 @@ function addCharacterByNameAndId(characterName, characterId, scale) {
     const newNode = document.createElement('tr');
     newNode.setAttribute('data-char-id', characterId);
 
-    const initialScale = (scale).toLocaleString(undefined, { minimumFractionDigits: 1 });
+    const initialScale = formatLocaleNumber(scale);
     newNode.innerHTML = `
         <td style="text-align: right" scope="row"><label for="char-size-${characterId}" class="col-form-label">${characterName}</label ></td >
         <td><input type="text" class="form-control" id="char-size-700" data-char-id="${characterId}" value="${initialScale}" onchange="updateScales()" onfocus="updateScales()" onkeyup="updateScales()" /></td>

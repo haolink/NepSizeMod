@@ -8,6 +8,8 @@ namespace NepSizeCore
     {
         public static string GAMENAME;
 
+        public static string WEBUI_TITLE;
+
         public static string SERVER_IP;
 
         public static int SERVER_PORT;

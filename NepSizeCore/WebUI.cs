@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -8,6 +10,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Text.Encodings.Web;
+using System.Drawing;
 using System.Text.Json;
 using WebSocketSharp;
 using WebSocketSharp.Server;
@@ -122,7 +125,7 @@ namespace NepSizeCore
         /// <summary>
         /// List of special UI files.
         /// </summary>
-        private Dictionary<string, Func<string>> _specialPaths;
+        private Dictionary<string, Func<byte[]>> _specialPaths;
 
         /// <summary>
         /// Resource name cache.
@@ -154,10 +157,11 @@ namespace NepSizeCore
             this._rootNamespace = typeof(WebUI).Namespace.Split(new char[] { '.' })[0];
             this._characterList = characterList;
 
-            this._specialPaths = new Dictionary<string, Func<string>>()
+            this._specialPaths = new Dictionary<string, Func<byte[]>>()
             {
-                [this._rootNamespace + ".webresources.virtual.characters.js"] = new Func<string>(() => this.GenerateVirtualCharacterList()),
-                [this._rootNamespace + ".webresources.virtual.sysconst.js"] = new Func<string>(() => this.GenerateConstants())
+                [this._rootNamespace + ".webresources.virtual.characters.js"] = new Func<byte[]>(() => this.GenerateVirtualCharacterList()),
+                [this._rootNamespace + ".webresources.virtual.sysconst.js"] = new Func<byte[]>(() => this.GenerateConstants()),
+                [this._rootNamespace + ".webresources.favicon.ico"] = new Func<byte[]>(() => this.GetGameIcon()),
             };
 
             List<string> validResources = new List<string>();
@@ -358,7 +362,7 @@ namespace NepSizeCore
         /// Generate the virtual character list.
         /// </summary>
         /// <returns></returns>
-        private string GenerateVirtualCharacterList()
+        private byte[] GenerateVirtualCharacterList()
         {
             if (_characterJson == null)
             {
@@ -369,24 +373,80 @@ namespace NepSizeCore
                 _characterJson = "const characterData = " + json + ";";
             }
 
-            return _characterJson;
+            return Encoding.UTF8.GetBytes(_characterJson);
         }
 
         /// <summary>
         /// Generate JS constants.
         /// </summary>
         /// <returns></returns>
-        private string GenerateConstants()
+        private byte[] GenerateConstants()
         {
             string consts = "";
 
 #if DEBUG
             consts += "window.debugMode = true;";
 #else
-            consts += "const debugMode = false;";
+            consts += "window.debugMode = false;";
 #endif
+            string decimalSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+            consts += $"window.userDecimalSeparator = \"{decimalSeparator}\";";
 
-            return consts;
+            if (!String.IsNullOrEmpty(CoreConfig.WEBUI_TITLE))
+            {
+                consts += $"window.siteTitle = \"{CoreConfig.WEBUI_TITLE}\";";
+            }
+
+            return Encoding.UTF8.GetBytes(consts);
+        }
+
+        /// <summary>
+        /// Cache for the icon.
+        /// </summary>
+        private byte[] _iconCache = null;
+
+        /// <summary>
+        /// Fetches trhe main game icon.
+        /// </summary>
+        /// <returns></returns>
+        private byte[] GetGameIcon()
+        {
+            if (_iconCache != null)
+            {
+                return _iconCache;
+            }
+
+            // Query process.
+            Process process = Process.GetCurrentProcess();
+
+            // Get executable.
+            string exePath = process.MainModule?.FileName;
+
+            if (string.IsNullOrEmpty(exePath) || !File.Exists(exePath))
+            {
+                _iconCache = new byte[0];
+                return _iconCache;
+            }
+
+            byte[] icoData = null;
+
+            try
+            {
+                icoData = IconExtractor.GetIconBytesFromExe(exePath);
+            }
+            catch (Exception ex)
+            {
+                icoData = null;
+            }
+
+            if (icoData == null)
+            {
+                icoData= new byte[0];
+            }
+
+
+            _iconCache = icoData;
+            return _iconCache;
         }
 
         /// <summary>
@@ -419,8 +479,7 @@ namespace NepSizeCore
         {
             if (_specialPaths.ContainsKey(path))
             {
-                string data = _specialPaths[path]();
-                return Encoding.UTF8.GetBytes(data);
+                return _specialPaths[path]();
             }
 
             if (_resourceCache.Contains(path))
