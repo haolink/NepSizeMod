@@ -568,6 +568,17 @@ namespace NepSizeCore
             }, null));
         }
 
+        /// <summary>
+        /// Emergency destructor.
+        /// </summary>
+        ~SizeDataThread()
+        {
+            if (!_pipeCancellation)
+            {
+                this.CloseThread();                
+            }
+        }
+
         #region Internal classes
 #pragma warning disable 0649
         /// <summary>

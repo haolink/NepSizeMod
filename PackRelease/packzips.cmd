@@ -1,17 +1,24 @@
 @echo off
 
-cd "%dp0"
+cd "%~dp0"
 
 set SZIP="C:\Program Files\7-Zip\7z.exe"
 
-echo Copying files
+echo Copying GMRE
 copy /y ..\NepSizeGMRE\bin\Release\net6.0\NepSizeGMREMerged.dll .\mod_gmre\BepInEx\plugins\NepSizeGMRE.dll >NUL
 copy /y ..\NepSizeGMRE\bin\Release\net6.0\NepSizeGMREMerged.dll .\mod_gmre_complete\BepInEx\plugins\NepSizeGMRE.dll >NUL
 
+echo Copying NepRiders
 copy /y ..\NepSizeNepRiders\bin\Release\net6.0\NepSizeNepRidersMerged.dll .\mod_nprd\BepInEx\plugins\NepSize.dll >NUL
 copy /y ..\NepSizeNepRiders\bin\Release\net6.0\NepSizeNepRidersMerged.dll .\mod_nprd_complete\BepInEx\plugins\NepSize.dll >NUL
 
+echo Copying SVS
 copy /y ..\NepSizeSVSMono\bin\Release\netstandard2.0\NepSizeSVSMonoMerged.dll .\mod_svs\BepInEx\plugins\NepSize.dll >NUL
+
+echo Copying NepRPG
+copy /y ..\NepSizeYuushaNeptune\bin\Release\net35\NepSizeYuushaNeptuneMerged.dll .\mod_srpg\BepInEx\plugins\YuushaNeptuneSize.dll >NUL
+copy /y ..\NepSizeYuushaNeptune\bin\Release\net35\NepSizeYuushaNeptuneMerged.dll .\mod_srpg_complete\BepInEx\plugins\YuushaNeptuneSize.dll >NUL
+
 
 echo Zipping
 for /d %%f in (*.*) do call :zipit %%f

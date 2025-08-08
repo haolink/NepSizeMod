@@ -108,7 +108,10 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     /// </summary>
     protected void OnDestroy()
     {
-        _sizeDataThread.CloseThread();
+        if (this._sizeDataThread != null)
+        {
+            this._sizeDataThread.CloseThread();
+        }        
     }
 
     /// <summary>

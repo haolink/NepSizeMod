@@ -1,15 +1,26 @@
 ﻿using BepInEx;
+using BepInEx.Configuration;
 using BepInEx.Logging;
 using HarmonyLib;
 using NepSizeCore;
+using NepSizeYuushaNeptune;
 using Spine.Unity;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using NepSizeYuushaNeptune;
 
-[BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+public static class PluginInfo
+{
+    public const string PLUGIN_GUID = "NepSizeSnepRPG";
+    public const string PLUGIN_NAME = "NepSize";
+    public const string PLUGIN_VERSION = "0.0.0.1";
+
+    public static Plugin Instance;
+    public static string AssetsFolder = Paths.PluginPath + "\\" + PluginInfo.PLUGIN_GUID + "\\Assets";
+}
+
+[BepInPlugin("net.gamindustri.plugins.nepsize.sneprpg", MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
 public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
 {
     internal static new ManualLogSource Logger;
@@ -55,9 +66,16 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
         Logger = base.Logger;
         Logger.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} is loaded!");
 
-        CoreConfig.SERVER_IP = "0.0.0.0";
-        CoreConfig.SERVER_LOCAL_SUBNET_ONLY = true;
-        CoreConfig.SERVER_PORT = 7878;
+        PluginInfo.Instance = this;
+
+        ConfigEntry<string> listenAddress = Config.Bind<string>("Server", "ListenIp", null, "IP which the web UI will listen on. Leave blank to listen on all IPs.");
+        ConfigEntry<int> listenPort = Config.Bind<int>("Server", "Port", 7878, "Listen port - default is 8989");
+        ConfigEntry<bool> listenSubnetOnly = Config.Bind<bool>("Server", "RestrictListenSubnet", true, "Only listen in the local IPv4 subnet, disable this if you wish to allow global access (you must know what you're doing!).");
+
+        CoreConfig.SERVER_IP = listenAddress.Value;
+        CoreConfig.SERVER_PORT = listenPort.Value;
+        CoreConfig.SERVER_LOCAL_SUBNET_ONLY = listenSubnetOnly.Value;
+
         CoreConfig.GAMENAME = "SRPG";
         CoreConfig.WEBUI_TITLE = "Super Nep RPG";
 
