@@ -8,7 +8,7 @@ using System.Text;
 /// <summary>
 /// Complex internal class to gain an icon as a byte array from an EXE file.
 /// </summary>
-public static class IconExtractor
+public static class WinAPICalls
 {
     private const uint RT_GROUP_ICON = 14;
     private const uint RT_ICON = 3;
@@ -46,6 +46,11 @@ public static class IconExtractor
         public uint BytesInRes;
         public uint ImageOffset;
     }
+
+    private const int LOCALE_SDECIMAL = 0x0000000E;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetLocaleInfoEx(string lpLocaleName, int LCType, StringBuilder lpLCData, int cchData);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hFile, uint dwFlags);
@@ -185,5 +190,27 @@ public static class IconExtractor
         {
             handle.Free();
         }
+    }
+
+    /// <summary>
+    /// Separator cache.
+    /// </summary>
+    private static string CachedDecimalSeparator = null;
+
+    /// <summary>
+    /// Determines the currently set Decimal separator.
+    /// </summary>
+    /// <returns></returns>
+    public static string GetSystemDecimalSeparator()
+    {
+        if (CachedDecimalSeparator == null)
+        {
+            const string LOCALE_NAME_USER_DEFAULT = null;
+            StringBuilder sb = new StringBuilder(10);
+            GetLocaleInfoEx(LOCALE_NAME_USER_DEFAULT, LOCALE_SDECIMAL, sb, sb.Capacity);
+            CachedDecimalSeparator = sb.ToString();
+        }
+
+        return CachedDecimalSeparator;
     }
 }

@@ -14,6 +14,7 @@ using Deli.Newtonsoft.Json;
 using WebSocketSharp;
 using WebSocketSharp.Server;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace NepSizeCore
 {
@@ -302,6 +303,10 @@ namespace NepSizeCore
         internal void ServerOnFilter(object sender, HttpRequestFilter e)
         {
             IPAddress source = e.Request.RemoteEndPoint.Address;
+            if (source.IsLocal())
+            {
+                return;
+            }
 
             bool inSubnet = false;
             foreach (AddressTuple tuple in this._localSubnets)
@@ -501,7 +506,9 @@ namespace NepSizeCore
 #else
             consts += "window.debugMode = false;";
 #endif
-            string decimalSeparator = CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator;
+
+
+            string decimalSeparator = WinAPICalls.GetSystemDecimalSeparator();
             consts += $"window.userDecimalSeparator = \"{decimalSeparator}\";";
 
             if (!String.IsNullOrEmpty(CoreConfig.WEBUI_TITLE))
@@ -544,7 +551,7 @@ namespace NepSizeCore
 
             try
             {
-                icoData = IconExtractor.GetIconBytesFromExe(exePath);
+                icoData = WinAPICalls.GetIconBytesFromExe(exePath);
             }
             catch (Exception ex)
             {

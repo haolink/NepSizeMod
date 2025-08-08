@@ -283,7 +283,7 @@
   </ItemGroup>
   
   <Target Name="PostBuildScript" AfterTargets="ILRepacker" Condition="'$(OS)' == 'Windows_NT'">
-    <Exec Command="copy /y &quot;$(OutDir)\YuushaNeptuneSizeMerged.dll&quot; &quot;F:\Steam\SteamApps\common\Super Neptunia RPG\BepInEx\plugins\YuushaNeptuneSize.dll&quot;" />
+    <Exec Command="copy /y &quot;$(OutDir)\NepSizeYuushaNeptuneMerged.dll&quot; &quot;F:\Steam\SteamApps\common\Super Neptunia RPG\BepInEx\plugins\YuushaNeptuneSize.dll&quot;" />
   </Target>
 
 </Project>
