@@ -22,7 +22,7 @@ All interactions with Unity are done in the game specific mods - as the games al
 - **NepSizeYuushaNeptune**: And now we have Super Neptunia RPG (Yuusha Neptune in Japan) - this one uses a very old version of Unity so it is compiled using .NET 3.5 standards. The default webserver port is 7878.
 
 # Compilation instruction
-All these tools can be built using normal dotnet console client or using VS 2022. The UI tool has some dependencies to WebView2 but NuGet should auto resolve those.
+All these tools can be built using normal dotnet console client or using VS 2022. To create the DLL files for the mods, NuGet will have to auto get ILRepack as it will merge libraries into one mod libray. This will be queried automatically.
 
 You will need to supply the BepInEx interop libraries for each project yourself.
 
