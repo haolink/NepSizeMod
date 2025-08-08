@@ -4,7 +4,7 @@
   <Target Name="ILRepacker" AfterTargets="Build">
     <ItemGroup>
       <AssembliesToMerge Include="$(OutputPath)/$(AssemblyName).dll" />
-      <AssembliesToMerge Include="$(OutputPath)/NepSizeCore.dll" />      
+      <AssembliesToMerge Include="@(ReferenceCopyLocalPaths)" Condition="'%(filename)' == 'Deli.Newtonsoft.Json'" />      
     </ItemGroup>
 
     <ILRepack
@@ -14,7 +14,7 @@
       DebugInfo="true"
       Parallel="true"
       LibraryPath="./Dependencies"
-      OutputFile="$(OutputPath)/$(AssemblyName)Merged.dll"
+      OutputFile="$(OutputPath)/$(AssemblyName).dll"
     />
   </Target>
 </Project>

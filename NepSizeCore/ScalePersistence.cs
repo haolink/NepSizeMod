@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Text;
-using System.IO;
-using System.Text.Json;
 using System.Linq.Expressions;
+using Deli.Newtonsoft.Json;
 
 namespace NepSizeCore
 {    
@@ -44,7 +43,7 @@ namespace NepSizeCore
 
             try
             {
-                scaleEntries = JsonSerializer.Deserialize<List<ScaleEntry>>(fileData);                
+                scaleEntries = JsonConvert.DeserializeObject<List<ScaleEntry>>(fileData);
             } 
             catch
             {
@@ -94,7 +93,7 @@ namespace NepSizeCore
             string scaleJson = null;
             try
             {
-                scaleJson = JsonSerializer.Serialize(scaleEntries);
+                scaleJson = JsonConvert.SerializeObject(scaleEntries);
             }
             catch (Exception ex)
             {

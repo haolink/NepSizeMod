@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34701.34
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NepSizeUI", "NepSizeUI\NepSizeUI.csproj", "{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NepSizeGMRE", "NepSizeGMRE\NepSizeGMRE.csproj", "{183E5CF6-EE4A-4DBF-8FAB-FBC61BEA97C7}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NepSizeSVSMono", "NepSizeSVSMono\NepSizeSVSMono.csproj", "{ACAFA3B1-81C1-4F19-B62E-0A44E8C83BBC}"
@@ -21,14 +19,6 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Debug|x64.ActiveCfg = Debug|x64
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Debug|x64.Build.0 = Debug|x64
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Release|x64.ActiveCfg = Release|x64
-		{65EDB693-8E61-4E85-BB23-BE3A8B6EB4DD}.Release|x64.Build.0 = Release|x64
 		{183E5CF6-EE4A-4DBF-8FAB-FBC61BEA97C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{183E5CF6-EE4A-4DBF-8FAB-FBC61BEA97C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{183E5CF6-EE4A-4DBF-8FAB-FBC61BEA97C7}.Debug|x64.ActiveCfg = Debug|x64

@@ -1,12 +1,11 @@
 using System;
 using System.IO;
-using System.IO.Pipes;
 using System.Threading;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Text;
 using System.Reflection;
+using Deli.Newtonsoft.Json;
+using Deli.Newtonsoft.Json.Linq;
 
 namespace NepSizeCore
 {
@@ -35,65 +34,6 @@ namespace NepSizeCore
             /// Close the connection if required.
             /// </summary>
             public void CloseSystem();
-        }
-
-        internal class PipeOutputWriter : IOutputWriter
-        {
-            /// <summary>
-            /// Pipe to write
-            /// </summary>
-            private NamedPipeServerStream _pipe;
-
-            /// <summary>
-            /// Message UUID.
-            /// </summary>
-            private string _uuid = null;
-
-            /// <summary>
-            /// Constructor.
-            /// </summary>
-            /// <param name="pipe"></param>
-            public PipeOutputWriter(NamedPipeServerStream pipe)
-            {
-                _pipe = pipe;
-            }
-
-            /// <summary>
-            /// Send a reply.
-            /// </summary>
-            /// <param name="outputData"></param>
-            public void SendReply(SizeServerResponse outputJson)
-            {
-                string outputData = JsonSerializer.Serialize(outputJson);
-
-                byte[] utfResponse = UTF8Encoding.UTF8.GetBytes(outputData);
-                byte[] replyLength = BitConverter.GetBytes(utfResponse.Length);
-
-                this._pipe.Write(replyLength, 0, 4);
-                this._pipe.Write(utfResponse, 0, utfResponse.Length);
-                this._pipe.Flush();
-            }
-
-            /// <summary>
-            /// Sets a message UUID.
-            /// </summary>
-            /// <param name="UUID">UUID.</param>
-            public void SetUUID(string UUID)
-            {
-                _uuid = UUID;
-            }
-
-            /// <summary>
-            /// Close the pipe.
-            /// </summary>
-            public void CloseSystem()
-            {
-                if (this._pipe != null)
-                {
-                    this._pipe.Dispose();
-                }
-                this._pipe = null;
-            }
         }
 
         internal class WebsocketOutputWrite : IOutputWriter
@@ -217,11 +157,6 @@ namespace NepSizeCore
         }
 
         /// <summary>
-        /// Thread for named pipes.
-        /// </summary>
-        private Thread _pipeThread;
-
-        /// <summary>
         /// Web socket thread.
         /// </summary>
         private Thread _socketThread;
@@ -229,22 +164,17 @@ namespace NepSizeCore
         /// <summary>
         /// Will be set in case the thread should be cancelled.
         /// </summary>
-        private CancellationTokenSource _pipeCancellation;
-
-        /// <summary>
-        /// Currently incoming pipe.
-        /// </summary>
-        private NamedPipeServerStream _currentPipe;
+        private volatile bool _pipeCancellation = false;
 
         /// <summary>
         /// Thread queue.
         /// </summary>
-        private ConcurrentQueue<ConnectionData> _mainThreadActiveConnections;
+        volatile private ThreadSafeQueue<ConnectionData> _mainThreadActiveConnections;
 
         /// <summary>
         /// Push notifications for Web Socket clients.
         /// </summary>
-        private ConcurrentQueue<SizeServerResponse> _pushNotifications;
+        volatile private ThreadSafeQueue<SizeServerResponse> _pushNotifications;
 
         /// <summary>
         /// Supported server commands.
@@ -293,23 +223,14 @@ namespace NepSizeCore
 
             RegisterAllCommands();
 
-            _pipeCancellation = new CancellationTokenSource();
-            _mainThreadActiveConnections = new ConcurrentQueue<ConnectionData>();
+            _pipeCancellation = false;
+            _mainThreadActiveConnections = new ThreadSafeQueue<ConnectionData>();
 
-            _pushNotifications = new ConcurrentQueue<SizeServerResponse>();
-
-            _pipeThread = new Thread(() => {                
-                RunServer(_pipeCancellation.Token);
-            })
-            {
-                IsBackground = true,
-                Priority = System.Threading.ThreadPriority.Lowest
-            };
-            _pipeThread.Start();
+            _pushNotifications = new ThreadSafeQueue<SizeServerResponse>();
 
             _socketThread = new Thread(() =>
             {
-                InitialiseWebUI(_pipeCancellation.Token);
+                InitialiseWebUI();
             })
             {
                 IsBackground = true,
@@ -336,7 +257,7 @@ namespace NepSizeCore
         /// <param name="activeCharacters"></param>
         private void PushNewCharacters(IList<uint> activeCharacters)
         {
-            JsonElement je = JsonCompatibility.SerializeToElement(activeCharacters);
+            JToken je = JToken.FromObject(activeCharacters);
 
             SizeServerResponse push = SizeServerResponse.CreatePushNotification("ActiveCharacterChange", "Active characters have changed", je);
 
@@ -370,35 +291,37 @@ namespace NepSizeCore
         {
             while (this._mainThreadActiveConnections.TryDequeue(out ConnectionData action))
             {
-                /*if (action.Pipe.IsConnected)
-                {
-                    action.Pipe.Dispose();
-                }*/
                 action.Close();
             }
+            _pipeCancellation = true;
             while (_mainThreadActiveConnections.TryDequeue(out _)) { }
-            _pipeCancellation.Cancel();
 
-            _currentPipe?.Dispose();
-
-            _pipeThread.Join();
+            _socketThread.Join();
         }
 
         /// <summary>
         /// Web UI shall be initialised.
         /// </summary>
-        private void InitialiseWebUI(CancellationToken token)
+        private void InitialiseWebUI()
         {
             DebugLogThreadSafe($"Starting web server - on port {CoreConfig.SERVER_PORT}, IP {CoreConfig.SERVER_IP}");
 
-            _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT, filterLocalSubnetOnly: CoreConfig.SERVER_LOCAL_SUBNET_ONLY,
+            try
+            {
+                _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT, filterLocalSubnetOnly: CoreConfig.SERVER_LOCAL_SUBNET_ONLY,
                 settingsObject: this._settingsObject);
-            _webUI.Log += WebUIDebugLog;
-            _webUI.MessageReceived += WebUIMessageReceived;
+                _webUI.Log += WebUIDebugLog;
+                _webUI.MessageReceived += WebUIMessageReceived;
 
-            _webUI.Start();            
+                _webUI.Start();
+            }
+            catch (Exception ex)
+            {
+                DebugLogThreadSafe(ex.Message);
+            }
 
-            while (!token.IsCancellationRequested)
+
+            while (!_pipeCancellation)
             {
                 while (_pushNotifications.TryDequeue(out SizeServerResponse notification))
                 {
@@ -411,32 +334,34 @@ namespace NepSizeCore
         /// Updates a settings object using a JsonElement object.
         /// </summary>
         /// <param name="settings"></param>
-        public void UpdateSettingsObject(JsonElement settings)
+        public void UpdateSettingsObject(JToken settings)
         {
             if (_settingsObject == null)
             {
                 return;
             }
 
-            foreach(JsonProperty property in settings.EnumerateObject())
+            foreach(JProperty property in settings.Children<JProperty>())
             {
                 string name = property.Name;
+                JToken value = property.Value;
+
                 PropertyInfo propertyInfo = _settingsObject.GetType().GetProperty(name);
                 if (propertyInfo == null) { continue; }
 
                 if (propertyInfo.PropertyType == typeof(float))
                 {
-                    if (property.Value.TryGetSingle(out float v))
+                    if (value.Type == JTokenType.Float || value.Type == JTokenType.Integer)
                     {
-                        propertyInfo.SetValue(_settingsObject, v);
+                        propertyInfo.SetValue(_settingsObject, value.ToObject<float>(), null);
                     }
                 }
                 else if(propertyInfo.PropertyType == typeof(bool))
                 {
-                    if (property.Value.ValueKind == JsonValueKind.True || property.Value.ValueKind == JsonValueKind.False)
+                    if (value.Type == JTokenType.Boolean)
                     {
-                        propertyInfo.SetValue(_settingsObject, property.Value.GetBoolean());
-                    }                    
+                        propertyInfo.SetValue(_settingsObject, value.ToObject<bool>(), null);
+                    }
                 }
             }
         }
@@ -449,84 +374,7 @@ namespace NepSizeCore
         private void WebUIDebugLog(object sender, LogEvent e)
         {
             DebugLogThreadSafe(e.Message);
-        }
-
-        /// <summary>
-        /// Start the pipe server.
-        /// </summary>
-        /// <param name="token">Which token handles the connection - close the server if this token is cancelled.</param>
-        private void RunServer(CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                _currentPipe = new NamedPipeServerStream("NepSizeCommandLet", PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-
-                ManualResetEvent waitHandle = new ManualResetEvent(false);
-
-                _currentPipe.BeginWaitForConnection((IAsyncResult ar) =>
-                {
-                    //DebugLogThreadSafe("Incoming!");
-                    try
-                    {
-                        _currentPipe.EndWaitForConnection(ar);
-                        ThreadPool.QueueUserWorkItem(UnpackMessage, _currentPipe);
-                    }
-#pragma warning disable 0168
-                    catch (Exception ex)
-#pragma warning restore 0168
-                    {
-
-                    }
-                    finally
-                    {
-                        waitHandle.Set();
-                    }
-                }, _currentPipe);
-
-                waitHandle.WaitOne();
-
-                _currentPipe = null;
-            }
-        }
-
-        /// <summary>
-        /// Data is incoming via the pipe.
-        /// </summary>
-        /// <param name="state">Pipe stream</param>
-        private void UnpackMessage(object state)
-        {
-            NamedPipeServerStream pipe = (NamedPipeServerStream)state;
-
-            try
-            {
-                // Read length
-                byte[] lengthBuffer = new byte[4];
-                pipe.Read(lengthBuffer, 0, 4);
-                int msgLength = BitConverter.ToInt32(lengthBuffer, 0);
-
-                // Read content
-                byte[] payloadBuffer = new byte[msgLength];
-                int totalRead = 0;
-                while (totalRead < msgLength)
-                {
-                    int read = pipe.Read(payloadBuffer, totalRead, msgLength - totalRead);
-                    if (read == 0)
-                    {
-                        DebugLogThreadSafe("Client closed the pipe prematurely.");
-                        pipe.Dispose();
-                        return;
-                    }
-                    totalRead += read;
-                }
-
-                string message = Encoding.UTF8.GetString(payloadBuffer);
-                HandleMessage(new PipeOutputWriter(pipe), message);
-            }
-            catch (IOException ex)
-            {
-                DebugLogThreadSafe("Error reading/writing: " + ex.Message);
-            }        
-        }
+        }        
 
         /// <summary>
         /// Send an error on the pipe reply.
@@ -579,10 +427,7 @@ namespace NepSizeCore
                 GenericCommand cmd = null;
                 try
                 {
-                    JsonSerializerOptions jso = new JsonSerializerOptions();
-                    jso.DefaultBufferSize = 1024;
-                    string tst = JsonSerializer.Serialize(new { test = "hello" });
-                    cmd = JsonSerializer.Deserialize<GenericCommand>(message);
+                    cmd = JsonConvert.DeserializeObject<GenericCommand>(message);
                 }
                 catch (Exception ex)
                 {
@@ -616,7 +461,7 @@ namespace NepSizeCore
         /// <param name="data">Parameters</param>
         /// <param name="output">Output stream</param>
         /// <returns>Can it correctly be executed?</returns>
-        private bool TryInvoke(string commandName, JsonElement? data, IOutputWriter output)
+        private bool TryInvoke(string commandName, JToken? data, IOutputWriter output)
         {
 #pragma warning disable 8632
             // Get action
@@ -640,19 +485,21 @@ namespace NepSizeCore
                 return true;
             }
 
-            if (data == null || data.Value.ValueKind != JsonValueKind.Object)
+            if (data == null || data.Type != JTokenType.Object)
             {
                 this.CreateExceptionReply($"Missing or invalid 'data' field for command '{commandName}'.", output);
                 return false;
             }
 
+            JObject dataObj = data as JObject;
+
             // Assign data JSON to method parameters.
             foreach (var param in parameters)
             {
-                if (!data.Value.TryGetProperty(param.Name, out var value))
+                if (!dataObj.TryGetValue(param.Name, out JToken value))
                 {
                     // Use default value if possible.
-                    if (!param.HasDefaultValue)
+                    if (param.DefaultValue == null)
                     {
                         this.CreateExceptionReply($"Missing parameter: {param.Name}", output);
                         return false;
@@ -666,7 +513,7 @@ namespace NepSizeCore
                 {
                     try
                     {
-                        object parsed = JsonSerializer.Deserialize(value.GetRawText(), param.ParameterType);
+                        object parsed = value.ToObject(param.ParameterType);
                         args[param.Position] = parsed;
                     }
                     catch (Exception ex)
@@ -731,7 +578,7 @@ namespace NepSizeCore
         {
             public string UUID { get; set; }
             public string command { get; set; }
-            public JsonElement? data { get; set; }
+            public JToken? data { get; set; }
         }    
 
         #pragma warning restore 0649

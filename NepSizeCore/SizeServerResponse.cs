@@ -1,5 +1,5 @@
 using System;
-using System.Text.Json;
+using Deli.Newtonsoft.Json.Linq;
 
 namespace NepSizeCore
 {
@@ -35,7 +35,7 @@ namespace NepSizeCore
         /// <summary>
         /// Transmitted data in the message.
         /// </summary>
-        public JsonElement? Data { get; set; }
+        public JToken? Data { get; set; }
 
         /// <summary>
         /// UUID (optional)
@@ -48,7 +48,7 @@ namespace NepSizeCore
         /// <param name="type"></param>
         /// <param name="message"></param>
         /// <param name="data"></param>
-        private SizeServerResponse(int type, string message, JsonElement? data)
+        private SizeServerResponse(int type, string message, JToken? data)
         {
             this.Type = type;
             this.Message = message;
@@ -61,7 +61,7 @@ namespace NepSizeCore
         /// <param name="message">Message text.</param>
         /// <param name="data">JSON Data</param>
         /// <returns>Response object</returns>
-        public static SizeServerResponse ReturnSuccess(string message, JsonElement? data = null)
+        public static SizeServerResponse ReturnSuccess(string message, JToken? data = null)
         {
             return new SizeServerResponse(MSG_TYPE_SUCCESS, message, data);
         }
@@ -72,7 +72,7 @@ namespace NepSizeCore
         /// <param name="message">Message text.</param>
         /// <param name="data">JSON Data</param>
         /// <returns>Response object</returns>
-        public static SizeServerResponse ReturnError(string message, JsonElement? data = null)
+        public static SizeServerResponse ReturnError(string message, JToken? data = null)
         {
             return new SizeServerResponse(MSG_TYPE_ERROR, message, data);
         }
@@ -83,7 +83,7 @@ namespace NepSizeCore
         /// <param name="message">Message text.</param>
         /// <param name="data">JSON Data</param>
         /// <returns>Response object</returns>
-        public static SizeServerResponse ReturnException(string message, JsonElement? data = null)
+        public static SizeServerResponse ReturnException(string message, JToken? data = null)
         {
             return new SizeServerResponse(MSG_TYPE_EXCEPTION, message, data);
         }
@@ -95,7 +95,7 @@ namespace NepSizeCore
         /// <param name="message"></param>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static SizeServerResponse CreatePushNotification(string context, string message, JsonElement? data = null)
+        public static SizeServerResponse CreatePushNotification(string context, string message, JToken? data = null)
         {
             SizeServerResponse ssr = new SizeServerResponse(MSG_TYPE_PUSH, message, data);
             ssr.Context = context;

@@ -1,7 +1,8 @@
 using System;
-using System.Text.Json;
 using System.Collections.Generic;
 using System.Linq;
+using Deli.Newtonsoft.Json;
+using Deli.Newtonsoft.Json.Linq;
 
 namespace NepSizeCore
 {
@@ -82,7 +83,7 @@ namespace NepSizeCore
         /// <returns>Data to send to the client.</returns>
         public SizeServerResponse GetGameSettings()
         {
-            return SizeServerResponse.ReturnSuccess("OK", JsonCompatibility.SerializeToElement(new
+            return SizeServerResponse.ReturnSuccess("OK", JToken.FromObject(new
             {
                 scaleAddress = SizeMemoryStorage.Instance(this._gamePlugin).ScaleListMemoryAddress,
                 charList = SizeMemoryStorage.Instance(this._gamePlugin).CharListMemoryAddress,
@@ -99,7 +100,7 @@ namespace NepSizeCore
         {
             List<uint> charIds = SizeMemoryStorage.Instance(this._gamePlugin).ActiveCharacters;
 
-            return SizeServerResponse.ReturnSuccess("OK", JsonCompatibility.SerializeToElement(new
+            return SizeServerResponse.ReturnSuccess("OK", JToken.FromObject(new
                 {
                     ids = charIds
                 }
@@ -120,7 +121,7 @@ namespace NepSizeCore
                 scaleEntries.Add(new ScaleEntry() { id = entry.Key, scale = entry.Value });
             }
             
-            return SizeServerResponse.ReturnSuccess("OK", JsonCompatibility.SerializeToElement(new
+            return SizeServerResponse.ReturnSuccess("OK", JToken.FromObject(new
                 {
                     scales = scaleEntries
                 }
@@ -145,7 +146,12 @@ namespace NepSizeCore
             return SizeServerResponse.ReturnSuccess("OK");
         }
 
-        public SizeServerResponse UpdateExtraSettings(JsonElement settings)
+        /// <summary>
+        /// Updating extra settings.
+        /// </summary>
+        /// <param name="settings"></param>
+        /// <returns></returns>
+        public SizeServerResponse UpdateExtraSettings(JToken settings)
         {
             this._sizeDataThread.UpdateSettingsObject(settings);
 

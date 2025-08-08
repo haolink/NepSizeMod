@@ -9,9 +9,8 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Drawing;
-using System.Text.Json;
+using Deli.Newtonsoft.Json;
 using WebSocketSharp;
 using WebSocketSharp.Server;
 using System.Runtime.CompilerServices;
@@ -87,7 +86,7 @@ namespace NepSizeCore
         public void SendReply(SizeServerResponse reply, string uuid)
         {
             reply.UUID = uuid;
-            string outputData = JsonSerializer.Serialize(reply);
+            string outputData = JsonConvert.SerializeObject(reply);
 
             this.Send(outputData);
         }
@@ -98,6 +97,24 @@ namespace NepSizeCore
     /// </summary>
     public class WebUI
     {
+        /// <summary>
+        /// Address Tuple for subnet.
+        /// </summary>
+        internal class AddressTuple
+        {
+            public IPAddress Address { get; private set; }
+            public IPAddress Subnet { get; private set; }
+
+            public AddressTuple(IPAddress addr, IPAddress sub)
+            {
+                Address = addr;
+                Subnet = sub;
+            }
+        }
+
+        /// <summary>
+        /// Settings description.
+        /// </summary>
         [Serializable]
         internal class SettingsDescriptor
         {
@@ -143,9 +160,9 @@ namespace NepSizeCore
         private string[] _resourceCache;
 
         /// <summary>
-        /// 
+        /// Local subnets.
         /// </summary>
-        private List<(IPAddress IP, IPAddress Subnet)> _localSubnets;
+        private List<AddressTuple> _localSubnets;
 
         /// <summary>
         /// Extra Settings.
@@ -156,8 +173,6 @@ namespace NepSizeCore
         /// String to describe the Extra settings.
         /// </summary>
         private string _extraSettingsJson;
-
-        public string InitLog = "";
 
         /// <summary>
         /// Constructor.
@@ -175,11 +190,12 @@ namespace NepSizeCore
 
                 foreach (PropertyInfo field in fields)
                 {
-                    SettingsDescriptionAttribute attr = field.GetCustomAttribute<SettingsDescriptionAttribute>();
-                    if (attr == null)
+                    Attribute[] attributes = Attribute.GetCustomAttributes(field, typeof(SettingsDescriptionAttribute));
+                    if (attributes.Length <= 0)
                     {
                         continue;
                     }
+                    SettingsDescriptionAttribute attr = (SettingsDescriptionAttribute)attributes[0];
 
                     Type ft = field.PropertyType;
                     string typeName = null;
@@ -193,7 +209,7 @@ namespace NepSizeCore
 
                     string description = attr.Description;
                     string name = field.Name;
-                    object value = field.GetValue(settingsObject);
+                    object value = field.GetValue(settingsObject, null);
 
                     this._extraSettings.Add(new SettingsDescriptor()
                     {
@@ -209,7 +225,7 @@ namespace NepSizeCore
                 this._extraSettings = null;
             }
 
-            this._extraSettingsJson = JsonSerializer.Serialize(this._extraSettings);
+            this._extraSettingsJson = JsonConvert.SerializeObject(this._extraSettings);
 
             if (String.IsNullOrEmpty(ipString))
             {
@@ -274,7 +290,7 @@ namespace NepSizeCore
         /// <param name="response"></param>
         public void SendPushNotification(SizeServerResponse response)
         {
-            string json = JsonSerializer.Serialize(response);
+            string json = JsonConvert.SerializeObject(response);
             this._server.WebSocketServices["/socket"].Sessions.BroadcastAsync(json, null);
         }
 
@@ -288,8 +304,11 @@ namespace NepSizeCore
             IPAddress source = e.Request.RemoteEndPoint.Address;
 
             bool inSubnet = false;
-            foreach ((IPAddress ip, IPAddress subnet) in this._localSubnets)
+            foreach (AddressTuple tuple in this._localSubnets)
             {
+                IPAddress ip = tuple.Address;
+                IPAddress subnet = tuple.Subnet;
+
                 if (IsInSameSubnet(source, ip, subnet))
                 {
                     inSubnet = true;
@@ -415,7 +434,18 @@ namespace NepSizeCore
             }
 
             // Rebuild the sanitized path
-            var sanitized = "/" + string.Join("/", stack.Reverse());
+            string[] segments = stack.ToArray(); // LIFO order
+            StringBuilder sb = new StringBuilder();
+            sb.Append("/");
+
+            for (int i = segments.Length - 1; i >= 0; i--)
+            {
+                sb.Append(segments[i]);
+                if (i > 0)
+                    sb.Append("/");
+            }
+
+            string sanitized = sb.ToString();
 
             return sanitized;
         }
@@ -433,9 +463,7 @@ namespace NepSizeCore
         {
             if (_characterJson == null)
             {
-                JsonSerializerOptions options = new JsonSerializerOptions();
-                options.WriteIndented = true;
-                string json = JsonSerializer.Serialize(this._characterList, options);
+                string json = JsonConvert.SerializeObject(this._characterList, Formatting.Indented);
 
                 _characterJson = "const characterData = " + json + ";";
             }
@@ -642,9 +670,9 @@ namespace NepSizeCore
         /// Get all active subnets.
         /// </summary>
         /// <returns></returns>
-        private static List<(IPAddress IP, IPAddress Subnet)> GetLocalIPSubnets()
+        private static List<AddressTuple> GetLocalIPSubnets()
         {
-            var result = new List<(IPAddress, IPAddress)>();
+            var result = new List<AddressTuple>();
 
             foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
             {
@@ -656,7 +684,7 @@ namespace NepSizeCore
                     if (ua.Address.AddressFamily != AddressFamily.InterNetwork)
                         continue;
 
-                    result.Add((ua.Address, ua.IPv4Mask));
+                    result.Add(new AddressTuple(ua.Address, ua.IPv4Mask));
                 }
             }
 

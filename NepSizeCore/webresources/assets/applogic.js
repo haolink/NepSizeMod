@@ -443,7 +443,7 @@ function addCharacterByNameAndId(characterName, characterId, scale) {
     newNode.innerHTML = `
         <td style="text-align: right" scope="row"><label for="char-size-${characterId}" class="col-form-label-sm">${characterName}</label ></td >
         <td><input type="text" class="form-control-sm" id="char-size-${characterId}" data-char-id="${characterId}" value="${initialScale}" onchange="updateScales()" onfocus="updateScales()" onkeyup="updateScales()" /></td>
-        <td><button type="button" onclick="return removeChar(${characterId})" class="btn btn-danger btn-remove-char">X</button></td>
+        <td><button type="button" onclick="return removeChar(${characterId})" class="btn btn-danger btn-remove-char btn-sm">X</button></td>
 `;
 
     characterList.insertBefore(newNode, emptyRow);

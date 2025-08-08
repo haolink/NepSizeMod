@@ -179,7 +179,7 @@ public static class IconExtractor
         try
         {
             IntPtr ptr = Marshal.UnsafeAddrOfPinnedArrayElement(data, offset);
-            return Marshal.PtrToStructure<T>(ptr);
+            return (T)Marshal.PtrToStructure(ptr, typeof(T));
         }
         finally
         {

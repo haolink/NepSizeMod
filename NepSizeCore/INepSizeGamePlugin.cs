@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
+using Deli.Newtonsoft.Json;
 
 namespace NepSizeCore
 {
@@ -10,11 +10,11 @@ namespace NepSizeCore
     [Serializable]
     public class CharacterData
     {
-        [JsonPropertyName("id")]
+        [JsonProperty("id")]
         public int Id { get; private set; }
-        [JsonPropertyName("name")]
+        [JsonProperty("name")]
         public string Name { get; private set; }
-        [JsonPropertyName("text")]
+        [JsonProperty("text")]
         public string Text { get; private set; }
 
         public CharacterData(int id, string name, string text)
