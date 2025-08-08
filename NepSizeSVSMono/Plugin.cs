@@ -27,6 +27,7 @@ public class Plugin : BaseUnityPlugin
 
         this.gameObject.AddComponent<NepSizePlugin>();
 
-        //Harmony.CreateAndPatchAll(typeof(DontPause));
+        Harmony.CreateAndPatchAll(typeof(DontPause));
+        Harmony.CreateAndPatchAll(typeof(ColliderUnitUpdate));
     }
 }

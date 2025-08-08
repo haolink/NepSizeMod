@@ -14,6 +14,7 @@ using System.Drawing;
 using System.Text.Json;
 using WebSocketSharp;
 using WebSocketSharp.Server;
+using System.Runtime.CompilerServices;
 
 namespace NepSizeCore
 {
@@ -97,6 +98,15 @@ namespace NepSizeCore
     /// </summary>
     public class WebUI
     {
+        [Serializable]
+        internal class SettingsDescriptor
+        {
+            public string Name { get; set; }
+            public object Value { get; set; }
+            public string Type { get; set; }
+            public string Description { get; set; }
+        }
+
         /// <summary>
         /// Server component.
         /// </summary>
@@ -138,13 +148,69 @@ namespace NepSizeCore
         private List<(IPAddress IP, IPAddress Subnet)> _localSubnets;
 
         /// <summary>
+        /// Extra Settings.
+        /// </summary>
+        private List<SettingsDescriptor> _extraSettings;
+
+        /// <summary>
+        /// String to describe the Extra settings.
+        /// </summary>
+        private string _extraSettingsJson;
+
+        public string InitLog = "";
+
+        /// <summary>
         /// Constructor.
         /// </summary>
         /// <param name="characterList"></param>
         /// <param name="ipString"></param>
         /// <param name="port"></param>
-        public WebUI(CharacterList characterList, string ipString = null, int port = 7979, bool filterLocalSubnetOnly = true)
+        public WebUI(CharacterList characterList, string ipString = null, int port = 7979, bool filterLocalSubnetOnly = true, Object settingsObject = null)
         {
+            this._extraSettings = new List<SettingsDescriptor>();
+            if (settingsObject != null)
+            {
+                Type type = settingsObject.GetType();
+                PropertyInfo[] fields = type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+                foreach (PropertyInfo field in fields)
+                {
+                    SettingsDescriptionAttribute attr = field.GetCustomAttribute<SettingsDescriptionAttribute>();
+                    if (attr == null)
+                    {
+                        continue;
+                    }
+
+                    Type ft = field.PropertyType;
+                    string typeName = null;
+                    if (ft == typeof(string)) { typeName = "string"; }
+                    else if (ft == typeof(float)) { typeName = "float"; }
+                    else if (ft == typeof(bool)) { typeName = "bool"; }
+                    else
+                    {
+                        continue;
+                    }                        
+
+                    string description = attr.Description;
+                    string name = field.Name;
+                    object value = field.GetValue(settingsObject);
+
+                    this._extraSettings.Add(new SettingsDescriptor()
+                    {
+                        Name = name,
+                        Value = value,
+                        Description = description,
+                        Type = typeName
+                    });
+                }
+            }
+            if (this._extraSettings.Count <= 0)
+            {
+                this._extraSettings = null;
+            }
+
+            this._extraSettingsJson = JsonSerializer.Serialize(this._extraSettings);
+
             if (String.IsNullOrEmpty(ipString))
             {
                 _server = new HttpServer(address: IPAddress.Any, port: port);
@@ -161,6 +227,7 @@ namespace NepSizeCore
             {
                 [this._rootNamespace + ".webresources.virtual.characters.js"] = new Func<byte[]>(() => this.GenerateVirtualCharacterList()),
                 [this._rootNamespace + ".webresources.virtual.sysconst.js"] = new Func<byte[]>(() => this.GenerateConstants()),
+                [this._rootNamespace + ".webresources.virtual.extrasettings.js"] = new Func<byte[]>(() => this.GenerateExtraSettingsFile()),
                 [this._rootNamespace + ".webresources.favicon.ico"] = new Func<byte[]>(() => this.GetGameIcon()),
             };
 
@@ -374,6 +441,16 @@ namespace NepSizeCore
             }
 
             return Encoding.UTF8.GetBytes(_characterJson);
+        }
+
+        /// <summary>
+        /// Generates the extra settings file.
+        /// </summary>
+        /// <returns></returns>
+        private byte[] GenerateExtraSettingsFile()
+        {
+            string res = "window.extraSettings = " + this._extraSettingsJson + ";";
+            return Encoding.UTF8.GetBytes(res);
         }
 
         /// <summary>

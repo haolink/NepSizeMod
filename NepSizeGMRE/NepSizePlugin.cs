@@ -114,8 +114,26 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
     private float ReadFootLiftupLimit(FootIK footIK)
     {
-        FieldInfo fi = typeof(FootIK).GetField("footLiftupLimit_", BindingFlags.NonPublic | BindingFlags.Instance);
-        return (float)(fi.GetValue(footIK));
+        return footIK.footLiftupLimit_; // Reflection not needed in IL2CPP context.
+        /*FieldInfo fi = typeof(FootIK).GetField("footLiftupLimit_", BindingFlags.NonPublic | BindingFlags.Instance);
+        return (float)(fi.GetValue(footIK));*/
+    }
+
+    private Dictionary<uint, float> _scaleCache;
+
+    public float? FetchScale(uint characterId)
+    {
+        if (this._scaleCache == null)
+        {
+            return null;
+        }
+
+        if (this._scaleCache.ContainsKey(characterId))
+        {
+            return this._scaleCache[characterId];
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -125,6 +143,8 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     {
         // Read scales from memory
         Dictionary<uint, float> scales = this._sizeMemoryStorage.SizeValues;
+
+        this._scaleCache = scales;
 
         // Determine active characters
         List<uint> activeCharacters = new List<uint>();

@@ -50,3 +50,23 @@ span.debug-unknown {
     font-weight: bold;
     color: red;
 }
+tbody#extra-settings {
+    display: none;
+}
+
+.ex-set-open {
+    display: none;
+}
+.ex-set-closed {
+    display: inline;
+}
+
+table tbody th#ex-settings-row {
+    border-top: solid 2px lightblue;
+    text-align: center;
+    background-color: #DFDFFF;
+    cursor: pointer;
+}
+table tbody th#ex-settings-row:hover {
+    background-color: #BFBFFF;
+}

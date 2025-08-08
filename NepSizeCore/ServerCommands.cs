@@ -31,6 +31,11 @@ namespace NepSizeCore
         private readonly INepSizeGamePlugin _gamePlugin;
 
         /// <summary>
+        /// Size Data thread.
+        /// </summary>
+        private readonly SizeDataThread _sizeDataThread;
+
+        /// <summary>
         /// Public logging method.
         /// </summary>
         /// <param name="message">Log message</param>
@@ -44,10 +49,11 @@ namespace NepSizeCore
         /// </summary>
         /// <param name="gameName">Code name of the game.</param>
         /// <param name="gamePlugin">Main plugin</param>
-        public ServerCommands(string gameName, INepSizeGamePlugin gamePlugin)
+        public ServerCommands(string gameName, INepSizeGamePlugin gamePlugin, SizeDataThread sizeDataThread)
         {
             _gameName = gameName;
             _gamePlugin = gamePlugin;
+            _sizeDataThread = sizeDataThread;
         }
 
         /// <summary>
@@ -136,7 +142,14 @@ namespace NepSizeCore
             {
                 ScalePersistence.PersistScales(SizeMemoryStorage.Instance(this._gamePlugin).SizeValues);
             }
-            return SizeServerResponse.ReturnSuccess("OK");           
+            return SizeServerResponse.ReturnSuccess("OK");
+        }
+
+        public SizeServerResponse UpdateExtraSettings(JsonElement settings)
+        {
+            this._sizeDataThread.UpdateSettingsObject(settings);
+
+            return SizeServerResponse.ReturnSuccess("OK");
         }
     }
 }

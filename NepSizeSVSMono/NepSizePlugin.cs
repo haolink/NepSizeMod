@@ -1,6 +1,8 @@
 using BepInEx.Configuration;
 using CharaIK;
+using Game.UI;
 using NepSizeCore;
+using NepSizeSVSMono;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -35,6 +37,16 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     private SizeMemoryStorage _sizeMemoryStorage;
 
     /// <summary>
+    /// Additional Settings.
+    /// </summary>
+    private AddtlSettings _extraSettings;
+
+    /// <summary>
+    /// Getter for the settings.
+    /// </summary>
+    public AddtlSettings ExtraSettings { get { return _extraSettings; } }
+
+    /// <summary>
     /// Init on Unity side.
     /// </summary>
     private void Start()
@@ -56,9 +68,11 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         CoreConfig.SERVER_PORT = listenPort.Value;
         CoreConfig.SERVER_LOCAL_SUBNET_ONLY = listenSubnetOnly.Value;
 
+        this._extraSettings = new AddtlSettings();
+
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);
+        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage, this._extraSettings);
     }
 
     /// <summary>
@@ -117,6 +131,50 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         return (float)(fi.GetValue(footIK));
     }
 
+    private Dictionary<uint, float> _scaleCache;
+
+    public float? FetchScale(uint characterId)
+    {
+        if (this._scaleCache == null)
+        {
+            return null;
+        }
+
+        if (this._scaleCache.ContainsKey(characterId))
+        {
+            return this._scaleCache[characterId];
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Check if a parent object of the GameObject go has a component of type T.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="child"></param>
+    /// <returns></returns>
+    public T GetComponentInParentChain<T>(GameObject go) where T : Component
+    {
+        Transform current = go.transform.parent;
+
+        while (current != null)
+        {
+            T component = current.GetComponent<T>();
+            if (component != null)
+            {
+                return component;
+            }
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    public float PlayerScale = 1.0f;
+
+    public uint PlayerModelId = 0;
+
     /// <summary>
     /// Update: read active characters and set their scales.
     /// </summary>
@@ -124,10 +182,28 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     {
         // Read scales from memory
         Dictionary<uint, float> scales = this._sizeMemoryStorage.SizeValues;
+        this._scaleCache = scales;
 
         // Determine active characters
         List<uint> activeCharacters = new List<uint>();
         DbModelChara[] o = GameObject.FindObjectsOfType<DbModelChara>().ToArray(); //Search for characters
+
+        /*MapUnitCollision muc = new MapUnitCollision();
+        muc.SetMoveVector()*/
+
+        float nPlayerScale = 1.0f;
+        uint? playerModelId = null;
+        bool isPlayer = false;
+
+        GameUi ui = GameObject.FindObjectOfType<GameUi>(true);
+        if (ui != null)
+        {
+            bool shouldBeOn = !this.ExtraSettings.DisableUI;
+            if (ui.gameObject.activeSelf != shouldBeOn)
+            {
+                ui.gameObject.SetActive(shouldBeOn);
+            }
+        }
 
         foreach (DbModelChara c in o) //Inspect
         {
@@ -138,6 +214,13 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                 {
                     activeCharacters.Add(mdlId);
                 }
+
+                isPlayer = (GetComponentInParentChain<MapUnitTypePlayerComponent>(c.gameObject) != null);
+                if (isPlayer)
+                {
+                    playerModelId = mdlId;
+                }
+
                 if (scales.ContainsKey(mdlId))
                 {
                     DbModelBase.DbModelBaseObjectManager om = c.transform.GetComponentInChildren<DbModelBase.DbModelBaseObjectManager>(); //Load her object manager
@@ -145,6 +228,11 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                     if (om != null && om.transform.localPosition.x != s)
                     {
                         om.transform.localScale = new Vector3(s, s, s);
+                    }
+
+                    if (isPlayer)
+                    {
+                        nPlayerScale = s;
                     }
 
                     FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
@@ -167,6 +255,12 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
         // Store the character ID into memory.
         this._sizeMemoryStorage.UpdateCharacterList(activeCharacters);
+
+        this.PlayerScale = nPlayerScale;
+        if (playerModelId != null)
+        {
+            this.PlayerModelId = playerModelId.Value;
+        }
     }
 
     /// <summary>

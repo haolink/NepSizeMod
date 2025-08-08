@@ -176,9 +176,125 @@ window.addEventListener("DOMContentLoaded", () => {
     select.addEventListener("pointerdown", () => {
         resetSelectList();
     });
-	
+
+    // Does the game provide extra settings?
+    if ('extraSettings' in window && window.extraSettings !== null) {
+        const exSettings = document.querySelector('#extra-settings');
+        exSettings.style.display = 'table-row-group';
+
+        let first = true;
+
+        // populate a list of them
+        window.extraSettings.forEach((st) => {
+            if (st.Type != 'bool' && st.Type != 'float') {
+                return;
+            }
+
+            const newRow = document.createElement('tr');
+            newRow.setAttribute('data-ex-setting-name', st.Name);
+            newRow.setAttribute('data-ex-setting-type', st.Type);
+            newRow.style.display = 'none';
+
+            if (first) {
+                newRow.style.borderTop = 'solid 2px black';                
+                first = false;
+            }
+
+            let html = ` 
+                <td style="text-align: right" scope="row"><label for="ex-setting-${st.Name}" class="col-form-label-sm">${st.Description}</label ></td >
+                <td style="vertical-align: middle">`;
+
+            if (st.Type == 'bool') {
+                html += `<input type="checkbox" class="form-check-input-sm" name="ex-setting-${st.Name}" id="ex-setting-${st.Name}"` + (st.Value === true ? ' checked="checked"' : '') + ' onchange="updateExSettings()" onfocus="updateExSettings()" onkeyup="updateExSettings()">';
+            } else if (st.Type == 'float') {
+                html += `<input class="form-control-sm" type="text" name="ex-setting-${st.Name}" id="ex-setting-${st.Name}" value="` + formatLocaleNumber(st.Value) + '" onchange="updateExSettings()" onfocus="updateExSettings()" onkeyup="updateExSettings()">';
+            }
+
+            html += `</td>
+                <td>&nbsp;</td>
+            `
+
+            newRow.innerHTML = html;
+            exSettings.appendChild(newRow);
+        });
+    }
+
 	window.interop.start();
 });
+
+/**
+ * Display or hide extra settings.
+ */
+function toggleSettings() {
+    const settings = document.querySelectorAll('tr[data-ex-setting-name]');
+    if (settings.length == 0) {
+        return;
+    }
+
+    const currentlyVisible = (settings[0].style.display != 'none');
+
+    settings.forEach((e) => {
+        e.style.display = currentlyVisible ? 'none' : 'table-row';
+    });
+
+    document.querySelectorAll('.ex-set-open').forEach((e) => {
+        e.style.display = currentlyVisible ? 'none' : 'inline';
+    });
+
+    document.querySelectorAll('.ex-set-closed').forEach((e) => {
+        e.style.display = currentlyVisible ? 'inline' : 'none';
+    });
+}
+
+/**
+ * Method which collects the values of extra settings - if available.
+ */
+function updateExSettings() {
+    const settingsRows = document.querySelectorAll('tr[data-ex-setting-name]');
+
+    const settingsSubmission = {};
+    let settingsSet = false;
+
+    settingsRows.forEach((row) => {
+        const name = row.getAttribute('data-ex-setting-name');
+        const type = row.getAttribute('data-ex-setting-type');
+
+        let value = null;
+
+        if (type == 'bool') {
+            value = row.querySelector('input').checked;
+        } else if (type == 'float') {
+            const inputField = row.querySelector('input');
+            const inputValue = parseLocaleNumber(inputField.value);
+
+            let invalid = false;
+            if (Number.isNaN(inputValue) || !Number.isFinite(inputValue)) {
+                invalid = true;
+            }
+
+            if (invalid) {
+                if (!inputField.classList.contains("v-invalid")) {
+                    inputField.classList.add("v-invalid");
+                }
+            } else {
+                if (inputField.classList.contains("v-invalid")) {
+                    inputField.classList.remove("v-invalid");
+                }
+
+                value = inputValue;
+            }
+        }
+
+        if (value != null) {
+            settingsSet = true;
+            settingsSubmission[name] = value;
+        }
+    });
+
+    if (settingsSet) {
+        window.interop.sendCommand("UpdateExtraSettings", { settings: settingsSubmission }, (e) => { console.log(e); });
+    }    
+}
 
 /**
  * Fill in the character list.
@@ -199,7 +315,7 @@ function populateMenu(characters) {
     });
 
     select.innerHTML = html;
-	listPopulated = true;
+    listPopulated = true;
 
     updateSelectList();
 };
@@ -325,8 +441,8 @@ function addCharacterByNameAndId(characterName, characterId, scale) {
 
     const initialScale = formatLocaleNumber(scale);
     newNode.innerHTML = `
-        <td style="text-align: right" scope="row"><label for="char-size-${characterId}" class="col-form-label">${characterName}</label ></td >
-        <td><input type="text" class="form-control" id="char-size-700" data-char-id="${characterId}" value="${initialScale}" onchange="updateScales()" onfocus="updateScales()" onkeyup="updateScales()" /></td>
+        <td style="text-align: right" scope="row"><label for="char-size-${characterId}" class="col-form-label-sm">${characterName}</label ></td >
+        <td><input type="text" class="form-control-sm" id="char-size-${characterId}" data-char-id="${characterId}" value="${initialScale}" onchange="updateScales()" onfocus="updateScales()" onkeyup="updateScales()" /></td>
         <td><button type="button" onclick="return removeChar(${characterId})" class="btn btn-danger btn-remove-char">X</button></td>
 `;
 

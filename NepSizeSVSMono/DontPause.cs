@@ -9,7 +9,7 @@ using UnityEngine;
 
 public class DontPause
 {
-    /*[HarmonyPatch(typeof(ApplicationManager), "OnApplicationFocus")]
+    [HarmonyPatch(typeof(ApplicationManager), "OnApplicationFocus")]
     [HarmonyPrefix]
     static void Prefix(ref bool focus)
     {
@@ -17,7 +17,7 @@ public class DontPause
         focus = true;
     }
 
-    [HarmonyPatch(typeof(DbLibrary<DbStructBase>), "SetDatas")]
+    /*[HarmonyPatch(typeof(DbLibrary<DbStructBase>), "SetDatas")]
     [HarmonyPrefix]
     static void PrefixGetRidOfNoire(ref List<List<DbStructBase>> lists)
     {

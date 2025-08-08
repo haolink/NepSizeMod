@@ -1,6 +1,7 @@
 ﻿using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
+using HarmonyLib;
 using Il2CppInterop.Runtime.Injection;
 
 /// <summary>
@@ -32,5 +33,7 @@ public class Plugin : BasePlugin
         PluginInfo.Instance = this;
 
         IL2CPPChainloader.AddUnityComponent(typeof(NepSizePlugin));
+
+        Harmony.CreateAndPatchAll(typeof(ColliderUnitUpdate));
     }
 }

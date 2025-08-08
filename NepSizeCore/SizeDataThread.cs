@@ -272,14 +272,22 @@ namespace NepSizeCore
         private SizeMemoryStorage _sizeMemoryStorage;
 
         /// <summary>
+        /// Settings storage. Generic object.
+        /// </summary>
+        private Object _settingsObject;
+
+        /// <summary>
         /// Initialises the main pipe server thread.
         /// </summary>
         /// <param name="serverCommands"></param>
-        public SizeDataThread(INepSizeGamePlugin mainPlugin, SizeMemoryStorage sizeMemoryStorage)
+        /// 
+        public SizeDataThread(INepSizeGamePlugin mainPlugin, SizeMemoryStorage sizeMemoryStorage, Object settingsObject = null)
         {
-            _serverCommands = new ServerCommands(CoreConfig.GAMENAME, mainPlugin);
+            _serverCommands = new ServerCommands(CoreConfig.GAMENAME, mainPlugin, this);
             _mainPlugin = mainPlugin;
             _sizeMemoryStorage = sizeMemoryStorage;
+
+            this._settingsObject = settingsObject;
 
             _sizeMemoryStorage.ActiveCharactersChanged += MemoryReportsNewCharacterList;
 
@@ -383,16 +391,52 @@ namespace NepSizeCore
         {
             DebugLogThreadSafe($"Starting web server - on port {CoreConfig.SERVER_PORT}, IP {CoreConfig.SERVER_IP}");
 
-            _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT, filterLocalSubnetOnly: CoreConfig.SERVER_LOCAL_SUBNET_ONLY);
+            _webUI = new WebUI(this._mainPlugin.GetCharacterList(), ipString: CoreConfig.SERVER_IP, port: CoreConfig.SERVER_PORT, filterLocalSubnetOnly: CoreConfig.SERVER_LOCAL_SUBNET_ONLY,
+                settingsObject: this._settingsObject);
             _webUI.Log += WebUIDebugLog;
             _webUI.MessageReceived += WebUIMessageReceived;
-            _webUI.Start();
+
+            _webUI.Start();            
 
             while (!token.IsCancellationRequested)
             {
                 while (_pushNotifications.TryDequeue(out SizeServerResponse notification))
                 {
                     _webUI.SendPushNotification(notification);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Updates a settings object using a JsonElement object.
+        /// </summary>
+        /// <param name="settings"></param>
+        public void UpdateSettingsObject(JsonElement settings)
+        {
+            if (_settingsObject == null)
+            {
+                return;
+            }
+
+            foreach(JsonProperty property in settings.EnumerateObject())
+            {
+                string name = property.Name;
+                PropertyInfo propertyInfo = _settingsObject.GetType().GetProperty(name);
+                if (propertyInfo == null) { continue; }
+
+                if (propertyInfo.PropertyType == typeof(float))
+                {
+                    if (property.Value.TryGetSingle(out float v))
+                    {
+                        propertyInfo.SetValue(_settingsObject, v);
+                    }
+                }
+                else if(propertyInfo.PropertyType == typeof(bool))
+                {
+                    if (property.Value.ValueKind == JsonValueKind.True || property.Value.ValueKind == JsonValueKind.False)
+                    {
+                        propertyInfo.SetValue(_settingsObject, property.Value.GetBoolean());
+                    }                    
                 }
             }
         }
