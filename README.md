@@ -32,4 +32,6 @@ You will need to supply the BepInEx interop libraries for each project yourself.
 - [Deli.Newtonsoft.Json](https://www.nuget.org/packages/Deli.Newtonsoft.Json/12.0.3) This is a fork of the popular Newtonsoft.Json library to function in Unity contexts. It has been built using the build.cmd inside the package with HAVE_CAS disabled and a simple fix in in JsonTypeReflector.cs. The library is included in *NepSizeCore/Libary/Deli.Newtonsoft.Json.dll* in a compiled form. [The modifications are provided on this fork repository](https://github.com/haolink/Deli.Newtonsoft.Json). It is licensed under the MIT license.
 - [il-repack](https://github.com/gluck/il-repack) is used to build these libraries - it is licensed unter the Apache-2.0 license. To automate this the project is using the [MSBuild task ILRepack.Lib.MSBuild.Task](https://github.com/ravibpatel/ILRepack.Lib.MSBuild.Task) which uses [the following license](https://github.com/ravibpatel/ILRepack.Lib.MSBuild.Task?tab=License-1-ov-file#readme) (which is essentially a simple open use license).
 
+All relevant third party licenses are described in THIRD_PARTY_NOTICES.md .
+
 This project is licensed under the BSD-3 license. See LICENSE for more details.
