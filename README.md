@@ -29,6 +29,6 @@ You will need to supply the BepInEx interop libraries for each project yourself.
 # Licenses
 - [BepinEx](https://github.com/BepInEx/BepInEx) is licensed under the GNU Lesser General Public License v2.1.
 - [websocket-sharp](https://github.com/sta/websocket-sharp) This project uses websocket-sharp and includes code of it in NepSizeCore. Websocket-sharp is licensed under the MIT license.
-- [Deli.Newtonsoft.Json](https://www.nuget.org/packages/Deli.Newtonsoft.Json/12.0.3) This is a fork of the popular Newtonsoft.Json library to function in Unity contexts. It has been built using the build.cmd inside the package with HAVE_CAS disabled and a simple fix in in JsonTypeReflector.cs. The library is included in *NepSizeCodeLibary/Deli.Newtonsoft.Json.dll* in a compiled form. [The modifications are provided on this fork repository](https://github.com/haolink/Deli.Newtonsoft.Json). It is licensed under the MIT license.
+- [Deli.Newtonsoft.Json](https://www.nuget.org/packages/Deli.Newtonsoft.Json/12.0.3) This is a fork of the popular Newtonsoft.Json library to function in Unity contexts. It has been built using the build.cmd inside the package with HAVE_CAS disabled and a simple fix in in JsonTypeReflector.cs. The library is included in *NepSizeCore/Libary/Deli.Newtonsoft.Json.dll* in a compiled form. [The modifications are provided on this fork repository](https://github.com/haolink/Deli.Newtonsoft.Json). It is licensed under the MIT license.
 
 This project is licensed under the BSD-3 license. See LICENSE for more details.
