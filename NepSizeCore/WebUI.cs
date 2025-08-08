@@ -463,9 +463,16 @@ namespace NepSizeCore
         {
             if (_characterJson == null)
             {
-                string json = JsonConvert.SerializeObject(this._characterList, Formatting.Indented);
+                try
+                {
+                    string json = JsonConvert.SerializeObject(this._characterList, Formatting.Indented);
 
-                _characterJson = "const characterData = " + json + ";";
+                    _characterJson = "const characterData = " + json + ";";
+                }
+                catch (Exception e)
+                {
+                    DebugLog("Weird error: " + e.Message);
+                }
             }
 
             return Encoding.UTF8.GetBytes(_characterJson);
