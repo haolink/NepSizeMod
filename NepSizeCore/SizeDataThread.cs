@@ -6,6 +6,7 @@ using System.Text;
 using System.Reflection;
 using Deli.Newtonsoft.Json;
 using Deli.Newtonsoft.Json.Linq;
+using System.Drawing;
 
 namespace NepSizeCore
 {
@@ -14,7 +15,7 @@ namespace NepSizeCore
     /// Receives messages via Named pipes, hands them to its command list which is dynamically gathered via 
     /// refleciton.
     /// </summary>
-    public class SizeDataThread
+    public sealed class SizeDataThread
     {
         internal interface IOutputWriter 
         {
@@ -130,13 +131,30 @@ namespace NepSizeCore
                 else
                 {
                     // Parse the reply, send it in a new non-blocking thread.
-                    Thread t = new Thread(() =>
-                    {                                                
-                        Output.SendReply(returnValue);
-
-                        this.Close();
-                    });
-                    t.Start();
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            Output.SendReply(returnValue);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Send output to debug log.                            
+                            SizeDataThread.Instance.DebugLogThreadSafe($"Error sending reply: {ex.Message}");
+                        }
+                        finally
+                        {
+                            try
+                            {
+                                // Close the connection.
+                                Close();
+                            }
+                            catch (Exception ex)
+                            {
+                                SizeDataThread.Instance.DebugLogThreadSafe($"Error closing connection: {ex.Message}");
+                            }
+                        }
+                    });                    
                 }
             }
 
@@ -155,6 +173,11 @@ namespace NepSizeCore
                 }
             }
         }
+
+        /// <summary>
+        /// Self reference.
+        /// </summary>
+        public static SizeDataThread Instance { get; private set; }
 
         /// <summary>
         /// Web socket thread.
@@ -213,6 +236,12 @@ namespace NepSizeCore
         /// 
         public SizeDataThread(INepSizeGamePlugin mainPlugin, SizeMemoryStorage sizeMemoryStorage, Object settingsObject = null)
         {
+            if (Instance != null)
+            {
+                throw new InvalidOperationException("SizeDataThread already initialised!");
+            }
+            Instance = this;
+
             _serverCommands = new ServerCommands(CoreConfig.GAMENAME, mainPlugin, this);
             _mainPlugin = mainPlugin;
             _sizeMemoryStorage = sizeMemoryStorage;
@@ -269,9 +298,16 @@ namespace NepSizeCore
         /// </summary>
         private void RegisterAllCommands()
         {
-            foreach (var method in _serverCommands.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance))
+            foreach (var method in _serverCommands.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
             {
+                // Only register methods that return SizeServerResponse.
                 if (method.ReturnType != typeof(SizeServerResponse)) {
+                    continue;
+                }
+
+                // Skip getters/setters and other compiler-generated methods.
+                if (method.IsSpecialName)
+                {
                     continue;
                 }
 
@@ -280,6 +316,7 @@ namespace NepSizeCore
                     _serverCommands.Log($"Only added the first instance of overloaded method {method.Name} - method overloading is not allowed.");
                     continue;
                 }
+                
                 _commandMap[method.Name] = method;
             }
         }
@@ -296,7 +333,13 @@ namespace NepSizeCore
             _pipeCancellation = true;
             while (_mainThreadActiveConnections.TryDequeue(out _)) { }
 
-            _socketThread.Join();
+            SizeMemoryStorage.DisposeInstance();
+
+            // Wait for background thread to terminate gracefully, but don't block game shutdown indefinitely
+            if (!_socketThread.Join(1000)) // Wait for up to 1 second
+            {
+                DebugLogThreadSafe("Background thread didn't terminate gracefully within timeout");
+            }
         }
 
         /// <summary>
@@ -327,6 +370,7 @@ namespace NepSizeCore
                 {
                     _webUI.SendPushNotification(notification);
                 }
+                Thread.Sleep(10); // Reduce CPU usage while remaining responsive
             }
         }
 
@@ -424,19 +468,18 @@ namespace NepSizeCore
 
             try
             {
-                GenericCommand cmd = null;
-                try
-                {
-                    cmd = JsonConvert.DeserializeObject<GenericCommand>(message);
-                }
-                catch (Exception ex)
-                {
-                    DebugLogThreadSafe("Exception: " + ex.Message + " " + ex.GetType().FullName);
-                }
+                GenericCommand cmd = JsonConvert.DeserializeObject<GenericCommand>(message);
 
                 if (cmd == null || string.IsNullOrEmpty(cmd.command))
                 {
-                    this.CreateExceptionReply($"Unknown data structure!", output);
+                    this.CreateExceptionReply("Invalid command structure", output);
+                    return false;
+                }
+
+                // Validate command name format (alphanumeric only)
+                if (!System.Text.RegularExpressions.Regex.IsMatch(cmd.command, @"^[a-zA-Z0-9]+$"))
+                {
+                    this.CreateExceptionReply("Invalid command format", output);
                     return false;
                 }
 
@@ -447,9 +490,15 @@ namespace NepSizeCore
 
                 return this.TryInvoke(cmd.command, cmd.data, output);
             }
+            catch (JsonException)
+            {
+                this.CreateExceptionReply("Invalid JSON format", output);
+                return false;
+            }
             catch (Exception ex)
             {
-                this.CreateExceptionReply($"JSON parsing error {ex.Message}", output);
+                DebugLogThreadSafe($"Unexpected error in HandleMessage: {ex.Message}");
+                this.CreateExceptionReply("Internal error", output);
                 return false;
             }
         }        
@@ -487,7 +536,7 @@ namespace NepSizeCore
 
             if (data == null || data.Type != JTokenType.Object)
             {
-                this.CreateExceptionReply($"Missing or invalid 'data' field for command '{commandName}'.", output);
+                this.CreateExceptionReply("Invalid data format", output);
                 return false;
             }
 
@@ -498,15 +547,15 @@ namespace NepSizeCore
             {
                 if (!dataObj.TryGetValue(param.Name, out JToken value))
                 {
-                    // Use default value if possible.
-                    if (param.DefaultValue == null)
+                    // Use default value if possible (.NET 3.5 compatible check)
+                    if (param.DefaultValue != DBNull.Value)
                     {
-                        this.CreateExceptionReply($"Missing parameter: {param.Name}", output);
-                        return false;
+                        args[param.Position] = param.DefaultValue;
                     }
                     else
                     {
-                        args[param.Position] = param.DefaultValue;
+                        this.CreateExceptionReply("Missing required parameter", output);
+                        return false;
                     }
                 }
                 else
@@ -518,7 +567,9 @@ namespace NepSizeCore
                     }
                     catch (Exception ex)
                     {
-                        this.CreateExceptionReply($"Parameter parse error for '{param.Name}': {ex.Message}", output);
+                        // Log detailed error for debugging but send generic message to client
+                        DebugLogThreadSafe($"Parameter conversion failed for {param.Name}: {ex.Message}");
+                        this.CreateExceptionReply("Invalid parameter value", output);
                         return false;
                     }
                 }            
@@ -535,7 +586,9 @@ namespace NepSizeCore
             }
             catch (Exception ex)
             {
-                this.CreateExceptionReply($"Exception in '{commandName}': {ex.Message}", output);
+                // Log detailed error for debugging but send generic message to client
+                DebugLogThreadSafe($"Failed to enqueue command '{commandName}': {ex.Message}");
+                this.CreateExceptionReply("Internal error", output);
                 return false;
             }
             #pragma warning restore 8632

@@ -2,36 +2,15 @@
 using Battle.BattleAI.AIBase.AIBattleBaseEnemy;
 using Battle.BattleAI.AIBase.AIBattleBasePlayer;
 using HarmonyLib;
-using IF.Battle.Camera;
-using JetBrains.Annotations;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
-using System.Text;
 using UnityEngine;
 
-public class ColliderUnitUpdate
-{
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(BattleCameraBase), "IsTransitioning")]
-    static void YouDoNotTransition(ref bool __result)
-    {
-        __result = false;
-    }
-
-    /*[HarmonyPatch(typeof(BattleInputStatus), "MoveVectorInput", MethodType.Getter)]
-    [HarmonyPostfix]
-    static void GetDoubleVector(ref Vector2 __result)
-    {
-        __result.x *= 20.0f;
-        __result.y *= 20.0f;
-    }*/
-
+/// <summary>
+/// Patches the speed of characters. Taller characters -> longer steps -> higher speeds.
+/// </summary>
+public class SpeedPatches
+{    
     /// <summary>
     /// Takes the speed multiplayer from MoveInputAccept.Apply and adjusts it based on player scale.
     /// </summary>
@@ -39,7 +18,14 @@ public class ColliderUnitUpdate
     /// <returns></returns>
     public static float AdjustSpeedMultiplier(BattlePlayerProduction player)
     {
-        float v = 0.1f; // Base multiplayer
+        float v = 0.1f; // Base multiplayer, taken from game.
+
+        // Omit if we shouldn't change.
+        if (!NepSizePlugin.Instance.ExtraSettings.AdjustSpeedPlayer)
+        {
+            return v;
+        }
+
         DbModelChara c = player.gameObject.GetComponentInChildren<DbModelChara>();
 
         uint charId = c.GetModelID().GetModel();
@@ -48,16 +34,28 @@ public class ColliderUnitUpdate
         if (f != null)
         {
             v *= f.Value;
-        }            
+        }
 
-        return v; // oder irgendetwas Dynamisches
+        return v;
     }
 
+    /// <summary>
+    /// Replaces the actual method Apply of MoveInputAccept. 
+    /// The code below was dumped from an actual leaked Mono build of the game.
+    /// In the IL2CPP shipped version we use Prefix to completely replace the method
+    /// and return false to prevent execution of the original.
+    /// 
+    /// It handles running speeds in battles.
+    /// </summary>
+    /// <param name="__instance"></param>
+    /// <param name="battle_status"></param>
+    /// <returns></returns>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPatch(typeof(MoveInputAccept), "Apply")]
     [HarmonyPrefix]
     static bool ReplaceMethodApply(ref MoveInputAccept __instance, ref BattleInputStatus battle_status)
     {
+        // Minimal code commenting as this is dnSpy code
         if (battle_status == null)
         {
             return false;
@@ -119,6 +117,7 @@ public class ColliderUnitUpdate
             {
                 return false;
             }
+            // Edit here - adjusting speed of the player.
             add_pos = move_position * AdjustSpeedMultiplier(battle_player) * elapsed_frame;
         }
         Vector3 old_pos = battle_status.RpgUnit.transform.position + add_pos;
@@ -132,20 +131,32 @@ public class ColliderUnitUpdate
         return false;
     }
 
+    /// <summary>
+    /// Helper class to store data from the prefix in.
+    /// </summary>
     internal class SpeedUidHolder
     {
         public float OriginalSpeed;
         public uint CharacterId;
     }
 
-    private static readonly ConditionalWeakTable<AIBattleBasePlayer, SpeedUidHolder> AIPLAYER_BACKUP = new();
+    /// <summary>
+    /// Dictionary to store speeds of AI assists.
+    /// </summary>
+    private static readonly ConditionalWeakTable<AIBattleBase, SpeedUidHolder> AIPLAYER_BACKUP = new();
 
-    private static void PatchFollowTargetMoveSpeed(AIBattleBasePlayer aiPlayer, bool patch)
+    /// <summary>
+    /// Patches the speed of NPCs in battle.
+    /// </summary>
+    /// <param name="aiPlayer">NPCs in the battle.</param>
+    /// <param name="patch">Patch (true) or Restore (false)</param>
+    private static void PatchFollowTargetMoveSpeed(AIBattleBase aiPlayer, bool patch)
     {
         SpeedUidHolder holder = null;
         if (!AIPLAYER_BACKUP.TryGetValue(aiPlayer, out holder))
         {
-            DbModelChara c = aiPlayer.OwnRpgUnit.gameObject.GetComponentInChildren<DbModelChara>();
+            //Store the move_speed and model ID for now.
+            DbModelChara c = aiPlayer.OwnRpgUnit.gameObject.GetComponentInChildren<DbModelChara>(); //expensive but only necessary once per battle per NPC.
             if (c != null)
             {
                 holder = new SpeedUidHolder { OriginalSpeed = aiPlayer.NowAIData.Follow.move_speed_, CharacterId = c.GetModelID().GetModel() };
@@ -155,6 +166,7 @@ public class ColliderUnitUpdate
 
         if (holder != null)
         {
+            // Patch - or unpatch the value.
             float? f = NepSizePlugin.Instance.FetchScale(holder.CharacterId);
 
             float value;
@@ -166,11 +178,16 @@ public class ColliderUnitUpdate
             {
                 value = holder.OriginalSpeed;
             }
-            
+
             aiPlayer.NowAIData.Follow.move_speed_ = value;
         }
     }
 
+    /// <summary>
+    /// Bunch of AI instructions to patch - in the prefix we update the values so the 
+    /// main method gets patched values.
+    /// </summary>
+    /// <param name="__instance"></param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPrefix]
     [HarmonyPatch(typeof(AIBattleBasePlayer), "ActionCommonMove")]
@@ -179,10 +196,17 @@ public class ColliderUnitUpdate
     [HarmonyPatch(typeof(AIBattleBasePlayer), "MoveAwayFromEnemy")]
     [HarmonyPatch(typeof(AIBattleBasePlayer), "ReturnBattleArea")]
     static void PatchAIMovespeed(ref AIBattleBasePlayer __instance)
-    {        
-        PatchFollowTargetMoveSpeed(__instance, true);
+    {
+        if (NepSizePlugin.Instance.ExtraSettings.AdjustSpeedNPC)
+        {
+            PatchFollowTargetMoveSpeed(__instance, true);
+        }
     }
 
+    /// <summary>
+    /// After execution (in postfix) we restore the values.
+    /// </summary>
+    /// <param name="__instance"></param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPostfix]
     [HarmonyPatch(typeof(AIBattleBasePlayer), "ActionCommonMove")]
@@ -192,43 +216,16 @@ public class ColliderUnitUpdate
     [HarmonyPatch(typeof(AIBattleBasePlayer), "ReturnBattleArea")]
     static void UnPatchAIMovespeed(ref AIBattleBasePlayer __instance)
     {
-        PatchFollowTargetMoveSpeed(__instance, false);
-    }
-
-
-    private static readonly ConditionalWeakTable<AIBattleBaseEnemy, SpeedUidHolder> AIENEMY_BACKUP = new();
-
-    private static void PatchFollowAITargetMoveSpeed(AIBattleBaseEnemy aiEnemy, bool patch)
-    {
-        SpeedUidHolder holder = null;
-        if (!AIENEMY_BACKUP.TryGetValue(aiEnemy, out holder))
+        if (NepSizePlugin.Instance.ExtraSettings.AdjustSpeedNPC)
         {
-            DbModelChara c = aiEnemy.OwnRpgUnit.gameObject.GetComponentInChildren<DbModelChara>();
-            if (c != null)
-            {
-                holder = new SpeedUidHolder { OriginalSpeed = aiEnemy.NowAIData.Follow.move_speed_, CharacterId = c.GetModelID().GetModel() };
-                AIENEMY_BACKUP.Add(aiEnemy, holder);
-            }
-        }
-
-        if (holder != null)
-        {
-            float? f = NepSizePlugin.Instance.FetchScale(holder.CharacterId);
-
-            float value;
-            if (f != null && patch)
-            {
-                value = holder.OriginalSpeed * f.Value;
-            }
-            else
-            {
-                value = holder.OriginalSpeed;
-            }
-
-            aiEnemy.NowAIData.Follow.move_speed_ = value;
+            PatchFollowTargetMoveSpeed(__instance, false);
         }
     }
 
+    /// <summary>
+    /// We repeat the same for Enemy NPCs. Prefix to patch.
+    /// </summary>
+    /// <param name="__instance"></param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPrefix]
     [HarmonyPatch(typeof(AIBattleBaseEnemy), "BackwardAction")]
@@ -244,9 +241,15 @@ public class ColliderUnitUpdate
     [HarmonyPatch(typeof(AIBattleBaseEnemy), "StraightRoundTripMove")]
     static void PatchAINonPlayerMovespeed(ref AIBattleBaseEnemy __instance)
     {
-        PatchFollowAITargetMoveSpeed(__instance, true);
+        if (NepSizePlugin.Instance.ExtraSettings.AdjustSpeedNPC)
+        {
+            PatchFollowTargetMoveSpeed(__instance, true);
+        }
     }
 
+    /// <summary>
+    /// We repeat the same for Enemy NPCs. Psotfix to unpatch.
+    /// </summary>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPostfix]
     [HarmonyPatch(typeof(AIBattleBaseEnemy), "BackwardAction")]
@@ -262,21 +265,41 @@ public class ColliderUnitUpdate
     [HarmonyPatch(typeof(AIBattleBaseEnemy), "StraightRoundTripMove")]
     static void UnPatchAINonPlayerMovespeed(ref AIBattleBaseEnemy __instance)
     {
-        PatchFollowAITargetMoveSpeed(__instance, false);
+        if (NepSizePlugin.Instance.ExtraSettings.AdjustSpeedNPC)
+        {
+            PatchFollowTargetMoveSpeed(__instance, false);
+        }
     }
 
-
+    /// <summary>
+    /// unit_base_ is a private variable.
+    /// </summary>
     private static readonly FieldInfo UNIT_FIELD_POINT_ROUTE = typeof(MapMovePointRoute).GetField("unit_base_", BindingFlags.NonPublic | BindingFlags.Instance);
+
+    /// <summary>
+    /// Following AI NPCs use the dictionary.
+    /// </summary>
     private static readonly ConditionalWeakTable<PointRoutePlayDistance, SpeedUidHolder> MAP_ROUTE_TO_SPEED = new();
 
+    /// <summary>
+    /// MoveRun is for NPCs following outside the battle.
+    /// Again we patch values before running this method.
+    /// </summary>
+    /// <param name="__instance"></param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPrefix]
     [HarmonyPatch(typeof(PointRoutePlayDistance), "MoveRun")]
     static void AdjustNpcSpeed(ref PointRoutePlayDistance __instance)
     {
+        if (!NepSizePlugin.Instance.ExtraSettings.AdjustSpeedNPC)
+        {
+            return;
+        }
+
         SpeedUidHolder suh = null;
         if (!(MAP_ROUTE_TO_SPEED.TryGetValue(__instance, out suh)))
         {
+            // Determine Speed Holder for safety.
             if (!(__instance is MapMovePointRoute))
             {
                 MAP_ROUTE_TO_SPEED.Add(__instance, null);
@@ -292,13 +315,13 @@ public class ColliderUnitUpdate
                 return;
             }
 
-            DbModelChara c = mubc.gameObject.GetComponentInChildren<DbModelChara>();
+            DbModelChara c = mubc.gameObject.GetComponentInChildren<DbModelChara>(); //Expensive, only needed once.
             if (c == null)
             {
                 return;
             }
 
-
+            // Determine model ID.
             uint? u = c.GetModelID()?.GetModel();
             if (u == null)
             {
@@ -317,9 +340,11 @@ public class ColliderUnitUpdate
 
         if (suh == null)
         {
+            // If not identified - return.
             return;
         }
-        
+
+        // Otherwise patch.
         float? f = NepSizePlugin.Instance.FetchScale(suh.CharacterId);
 
         if (f != null)
@@ -328,16 +353,25 @@ public class ColliderUnitUpdate
         }
     }
 
+    /// <summary>
+    /// Restore after MoveRun.
+    /// </summary>
+    /// <param name="__instance"></param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPostfix]
     [HarmonyPatch(typeof(PointRoutePlayDistance), "MoveRun")]
     static void PostAdjustNpcSpeed(ref PointRoutePlayDistance __instance)
     {
+        if (!NepSizePlugin.Instance.ExtraSettings.AdjustSpeedNPC)
+        {
+            return;
+        }
+
         SpeedUidHolder suh = null;
         if ((MAP_ROUTE_TO_SPEED.TryGetValue(__instance, out suh)))
         {
             if (suh == null)
-            {                
+            {
                 return;
             }
 
@@ -345,18 +379,24 @@ public class ColliderUnitUpdate
         }
     }
 
+    /// <summary>
+    /// Player movement outside battle.
+    /// </summary>
+    /// <param name="__instance"></param>
+    /// <param name="move_vector"></param>
     [System.Diagnostics.CodeAnalysis.SuppressMessage("CodeQuality", "IDE0051")]
     [HarmonyPatch(typeof(MapUnitBaseComponent), "MoveVector")]
     [HarmonyPrefix]
     static void Prefix(ref MapUnitBaseComponent __instance, ref Vector3 move_vector)
     {
-        if (__instance == null || move_vector.Equals(Vector3.zero))
+        if (__instance == null || move_vector.Equals(Vector3.zero) || !NepSizePlugin.Instance.ExtraSettings.AdjustSpeedPlayer)
         {
             return;
         }
 
         GameObject go = __instance.gameObject;
-        if (go.GetComponentInChildren<DbModelChara>() is DbModelChara c) {
+        if (go.GetComponentInChildren<DbModelChara>() is DbModelChara c)
+        {
             uint charId = c.GetModelID().GetModel();
 
             float? f = NepSizePlugin.Instance.FetchScale(charId);

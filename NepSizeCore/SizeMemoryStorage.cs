@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -30,8 +31,13 @@ namespace NepSizeCore
     /// Memory manager which reserves memory in the game's main memory and pins it.
     /// It can then be written by a client.
     /// </summary>
-    public class SizeMemoryStorage
+    public class SizeMemoryStorage : IDisposable
     {
+        /// <summary>
+        /// Is disposed?
+        /// </summary>
+        private bool _disposed = false;
+
         /// <summary>
         /// 16 KB of storage for scales
         /// </summary>
@@ -76,7 +82,7 @@ namespace NepSizeCore
         /// <param name="plugin"></param>
         /// <returns></returns>
         public static SizeMemoryStorage Instance(INepSizeGamePlugin plugin)
-        {    
+        {
             if (_instance == null)
             {
                 _instance = new SizeMemoryStorage(plugin);
@@ -103,7 +109,7 @@ namespace NepSizeCore
         /// </summary>
         public long ScaleListMemoryAddress { get { return _scaleListMemoryAddress; } }
 
-        
+
         /// <summary>
         /// Address for the character list memory.
         /// </summary>
@@ -147,6 +153,26 @@ namespace NepSizeCore
         /// Fire event when active characters differ from before.
         /// </summary>
         public event EventHandler<ActiveCharactersChangedEvent> ActiveCharactersChanged;
+
+        /// <summary>
+        /// Cached size values to avoid memory scanning on every access.
+        /// </summary>
+        private Dictionary<uint, float> _sizeValuesCache = null;
+
+        /// <summary>
+        /// Last time the size values cache was updated.
+        /// </summary>
+        private DateTime _lastScaleCacheUpdate = DateTime.MinValue;
+
+        /// <summary>
+        /// List of active characters, cache.
+        /// </summary>
+        private List<uint> _activeCharacterCache = null;
+
+        /// <summary>
+        /// Cache validity duration in milliseconds.
+        /// </summary>
+        private const int CACHE_VALIDITY_MS = 500;
 
         /// <summary>
         /// Private constructor.
@@ -197,29 +223,45 @@ namespace NepSizeCore
 
         /// <summary>
         /// Create properties for the data which read the actual scale data.
+        /// Uses time-based cache to avoid memory scanning on every access while remaining
+        /// responsive to external CheatEngine modifications.
         /// </summary>
         public Dictionary<uint, float> SizeValues
         {
             get
             {
-                Dictionary<uint, float> values = new Dictionary<uint, float>();
-                this._scaleListMemoryStream.Seek(0, SeekOrigin.Begin);
-                uint cId;
-                while (this._scaleListMemoryStream.Position < (MEM_SCALELIST_SIZE - 8) && (cId = this._scaleListMemoryReader.ReadUInt32()) != 0)
+                DateTime now = DateTime.UtcNow;
+                if (_sizeValuesCache == null || (now - _lastScaleCacheUpdate).TotalMilliseconds > CACHE_VALIDITY_MS)
                 {
-                    float s = this._scaleListMemoryReader.ReadSingle();
-                    if (s > 0 && s < float.MaxValue) {
-                        values[cId] = s;
-                    }
+                    // Perform memory scan and update cache
+                    _sizeValuesCache = ScanMemoryForSizeValues();
+                    _lastScaleCacheUpdate = now;
                 }
-                return values;
+                // Return copy to prevent external modification of cache
+                return new Dictionary<uint, float>(_sizeValuesCache);
             }
         }
 
         /// <summary>
-        /// List of active characters, cache.
+        /// Scans the pinned memory to extract current size values.
         /// </summary>
-        private List<uint> _activeCharacterCache = null;        
+        /// <returns>Dictionary of character ID to scale values</returns>
+        private Dictionary<uint, float> ScanMemoryForSizeValues()
+        {
+            Dictionary<uint, float> values = new Dictionary<uint, float>();
+            this._scaleListMemoryStream.Seek(0, SeekOrigin.Begin);
+            uint cId;
+            while (this._scaleListMemoryStream.Position < (MEM_SCALELIST_SIZE - 8) && (cId = this._scaleListMemoryReader.ReadUInt32()) != 0)
+            {
+                float s = this._scaleListMemoryReader.ReadSingle();
+                if (s > 0 && s < float.MaxValue)
+                {
+                    values[cId] = s;
+                }
+            }
+            return values;
+        }
+
 
         /// <summary>
         /// List of active characters, virtual property.
@@ -228,6 +270,7 @@ namespace NepSizeCore
         {
             get
             {
+                DateTime now = DateTime.UtcNow;
                 if (_activeCharacterCache != null)
                 {
                     return _activeCharacterCache;
@@ -275,7 +318,7 @@ namespace NepSizeCore
                 {
                     entries[size.Key] = f;
                 }
-            }            
+            }
 
             // Veryify
             if (entries.Count > MAX_SCALELIST_LENGTH)
@@ -293,6 +336,10 @@ namespace NepSizeCore
             this._plugin.DebugLog("Written");
 
             this._scaleListMemoryWriter.Write(((uint)0));
+            
+            // Update cache with the entries we just wrote to memory
+            _sizeValuesCache = new Dictionary<uint, float>(entries);
+            _lastScaleCacheUpdate = DateTime.UtcNow;
         }
 
         /// <summary>
@@ -300,38 +347,131 @@ namespace NepSizeCore
         /// </summary>
         /// <param name="characterIds">IDs of characters</param>
         /// <exception cref="Exception"></exception>
-        public void UpdateCharacterList(List<uint> characterIds) {
+        public void UpdateCharacterList(List<uint> characterIds)
+        {
             if (characterIds.Count > MEM_CHARLIST_LENGTH)
             {
                 throw new Exception("Maximum storage capacity exceeded");
-            }            
+            }
             characterIds.Sort();
 
             bool changed = false;
-            if (_activeCharacterCache == null)
+            List<uint> currentCharacters = this.ActiveCharacters; //Reads either from cache or memory.
+
+            if (!Enumerable.SequenceEqual(characterIds, currentCharacters))
             {
-                _activeCharacterCache = characterIds;
-                changed = true;
-            }
-            if (!Enumerable.SequenceEqual(characterIds, _activeCharacterCache)) {
-                _activeCharacterCache = characterIds;
+                _plugin?.DebugLog("Changed from [" + String.Join(", ", new List<uint>(currentCharacters.ToArray()).ConvertAll(i => i.ToString()).ToArray())
+                                        + "] to [" + String.Join(", ", new List<uint>(characterIds.ToArray()).ConvertAll(i => i.ToString()).ToArray()) + "]");
                 changed = true;
             }
 
             if (changed)
             {
+                _activeCharacterCache = new List<uint>(characterIds.Distinct().ToList());
+
                 if (ActiveCharactersChanged != null)
                 {
-                    ActiveCharactersChanged(this, new ActiveCharactersChangedEvent(_activeCharacterCache.Distinct().ToList()));
+                    ActiveCharactersChanged(this, new ActiveCharactersChangedEvent(_activeCharacterCache));
                 }
-            }
-            
-            this._charListMemoryStream.Seek(0, SeekOrigin.Begin);
-            foreach (uint characterId in characterIds)
-            {
-                this._charListMemoryWriter.Write(characterId);
-            }
-            this._charListMemoryWriter.Write((uint)0);
+
+                this._charListMemoryStream.Seek(0, SeekOrigin.Begin);
+                foreach (uint characterId in _activeCharacterCache)
+                {
+                    this._charListMemoryWriter.Write(characterId);
+                }
+                this._charListMemoryWriter.Write((uint)0);
+            }            
         }
+        
+        /// <summary>
+        /// Disposes the resources used by the memory storage.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// Disposes the resources used by the memory storage.
+        /// </summary>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources
+                    _scaleListMemoryReader?.Close();
+                    _scaleListMemoryWriter?.Close();
+                    _scaleListMemoryStream?.Dispose();
+
+                    _charListMemoryReader?.Close();
+                    _charListMemoryWriter?.Close();
+                    _charListMemoryStream?.Dispose();
+
+                    _scaleListMemoryReader = null;
+                    _scaleListMemoryWriter = null;
+                    _scaleListMemoryStream = null;
+
+                    _charListMemoryReader = null;
+                    _charListMemoryWriter = null;
+                    _charListMemoryStream = null;
+                    
+                    // Clear cache
+                    _sizeValuesCache = null;
+                }
+
+                // Free unmanaged resources (GCHandle) - use try-catch to prevent partial cleanup
+                try
+                {
+                    if (_scaleListHandle.IsAllocated)
+                    {
+                        _scaleListHandle.Free();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log error but continue cleanup
+                    _plugin?.DebugLog($"Error freeing scale list handle: {ex.Message}");
+                }
+
+                try
+                {
+                    if (_charListHandle.IsAllocated)
+                    {
+                        _charListHandle.Free();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log error but continue cleanup
+                    _plugin?.DebugLog($"Error freeing char list handle: {ex.Message}");
+                }
+                
+                // Free static byte arrays to allow GC collection
+                _scaleMemory = null;
+                _charList = null;
+
+                _disposed = true;
+            }
+        }
+
+      /// <summary>
+      /// Finalizer as safety net.
+      /// </summary>
+      ~SizeMemoryStorage()
+      {
+          Dispose(false);
+      }
+
+      /// <summary>
+      /// Disposes the singleton instance.
+      /// </summary>
+      public static void DisposeInstance()
+      {
+          _instance?.Dispose();
+          _instance = null;
+      }
     }
 }

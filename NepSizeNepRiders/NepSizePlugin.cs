@@ -1,6 +1,8 @@
 using BepInEx.Configuration;
 using CharaIK;
+using HarmonyLib;
 using NepSizeCore;
+using NepSizeNepRiders;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,6 +34,11 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     private SizeMemoryStorage _sizeMemoryStorage;
 
     /// <summary>
+    /// Size memory.
+    /// </summary>
+    public SizeMemoryStorage SizeMemoryStorage {  get { return _sizeMemoryStorage; } }
+
+    /// <summary>
     /// Init on Unity side.
     /// </summary>
     private void Start()
@@ -48,6 +55,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         ConfigEntry<bool> listenSubnetOnly = PluginInfo.Instance.Config.Bind<bool>("Server", "RestrictListenSubnet", true, "Only listen in the local IPv4 subnet, disable this if you wish to allow global access (you must know what you're doing!).");
 
         CoreConfig.GAMENAME = "NPRD";
+        CoreConfig.WEBUI_TITLE = "Neptunia Riders";
         CoreConfig.SERVER_IP = listenAddress.Value;
         CoreConfig.SERVER_PORT = listenPort.Value;
         CoreConfig.SERVER_LOCAL_SUBNET_ONLY = listenSubnetOnly.Value;
@@ -57,6 +65,8 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
         this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);
+
+        Harmony.CreateAndPatchAll(typeof(ScaleDbModelChara));
     }
 
     /// <summary>
@@ -105,88 +115,32 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     }
 
     /// <summary>
-    /// Check if a parent object of the GameObject go has a component of type T.
+    /// Active characters - cleared in every Update() as written by ScaleDbModelChara.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="child"></param>
-    /// <returns></returns>
-    public T GetComponentInParentChain<T>(GameObject go) where T : Component
+    private List<uint> _activeCharacterCache = new List<uint>();
+
+    /// <summary>
+    /// Writes an entry to the active character list.
+    /// </summary>
+    /// <param name="id"></param>
+    public void MarkCharacterIdActive(uint id)
     {
-        Transform current = go.transform.parent;
-
-        while (current != null)
+        if (!this._activeCharacterCache.Contains(id))
         {
-            T component = current.GetComponent<T>();
-            if (component != null)
-            {
-                return component;
-            }
-            current = current.parent;
+            this._activeCharacterCache.Add(id);
         }
-
-        return null;
     }
 
     /// <summary>
-    /// Foot IK offsets.
-    /// </summary>
-    private Dictionary<uint, float> _footIKOffsets = new Dictionary<uint, float>();
-
-    /// <summary>
-    /// Update: read active characters and set their scales.
+    /// Update: submit active characters to Size Memory Storage.
     /// </summary>
     private void Update()
     {
-        // Read scales from memory
-        Dictionary<uint, float> scales = this._sizeMemoryStorage.SizeValues;
-
-        // Determine active characters
-        List<uint> activeCharacters = new List<uint>();
-        DbModelChara[] o = GameObject.FindObjectsOfType<DbModelChara>().ToArray(); //Search for characters
-
-        foreach (DbModelChara c in o) //Inspect
-        {
-            if (c.model_id_ != null) //Character has a valid id
-            {
-                uint mdlId = c.model_id_.model_;
-                if (!activeCharacters.Contains(mdlId))
-                {
-                    activeCharacters.Add(mdlId);
-                }
-                if (scales.ContainsKey(mdlId))
-                {
-                    DbModelBase.DbModelBaseObjectManager om = c.transform.GetComponentInChildren<DbModelBase.DbModelBaseObjectManager>(); //Load her object manager
-                    float s = scales[mdlId];
-                    if (om != null && om.transform.localPosition.x != s)
-                    {
-                        DbModelVehicle v = GetComponentInParentChain<DbModelVehicle>(c.gameObject);
-                        if (v != null)
-                        {
-                            // On vechicle
-                            om.transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
-                            v.gameObject.transform.localScale = new Vector3(s, s, s); 
-                        } else
-                        {
-                            // Not on vehicle
-                            om.transform.localScale = new Vector3(s, s, s);
-                        }                        
-                    }
-
-                    FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
-                    if (footIK != null)
-                    {
-                        if (!_footIKOffsets.ContainsKey(mdlId))
-                        {
-                            _footIKOffsets.Add(mdlId, footIK.put_offset_.y);
-                        }
-                        footIK.put_offset_ = new Vector3(footIK.put_offset_.x, s * _footIKOffsets[mdlId], footIK.put_offset_.z);
-                    }
-                }
-            }
-        }
-
         // Store the character ID into memory.
-        this._sizeMemoryStorage.UpdateCharacterList(activeCharacters);
+        this._sizeMemoryStorage.UpdateCharacterList(_activeCharacterCache);
+
+        // Early update in the hooks can update again!
+        _activeCharacterCache.Clear();
     }
 
     /// <summary>
@@ -198,6 +152,10 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         Debug.Log(message);
     }
 
+    /// <summary>
+    /// Character list for the Web UI.
+    /// </summary>
+    /// <returns></returns>
     public CharacterList GetCharacterList()
     {
         return new CharacterList()

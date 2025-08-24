@@ -1,12 +1,9 @@
-using BepInEx.Configuration;
-using CharaIK;
-using NepSizeCore;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
+using BepInEx.Configuration;
+using NepSizeCore;
 using UnityEngine;
-using static System.Net.WebRequestMethods;
+using HarmonyLib;
 
 /// <summary>
 /// Main plugin for Game Maker.
@@ -34,6 +31,16 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     private SizeMemoryStorage _sizeMemoryStorage;
 
     /// <summary>
+    /// Additional Settings.
+    /// </summary>
+    private AddtlSettings _extraSettings;
+
+    /// <summary>
+    /// Getter for the settings.
+    /// </summary>
+    public AddtlSettings ExtraSettings { get { return _extraSettings; } }
+
+    /// <summary>
     /// Init on Unity side.
     /// </summary>
     private void Start()
@@ -44,7 +51,10 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
             Debug.Log("Tried to start another object of this? Unity, water u doing?");
             return;
         }
-        
+
+        // Set up settings object.
+        this._extraSettings = new AddtlSettings();
+
         ConfigEntry<string> listenAddress = PluginInfo.Instance.Config.Bind<string>("Server", "ListenIp", null, "IP which the web UI will listen on. Leave blank to listen on all IPs.");
         ConfigEntry<int> listenPort = PluginInfo.Instance.Config.Bind<int>("Server", "Port", 7979, "Listen port - default is 7979");
         ConfigEntry<bool> listenSubnetOnly = PluginInfo.Instance.Config.Bind<bool>("Server", "RestrictListenSubnet", true, "Only listen in the local IPv4 subnet, disable this if you wish to allow global access (you must know what you're doing!).");
@@ -59,7 +69,12 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
-        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);
+        this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage, this._extraSettings);
+
+        // Set up game patches finally.
+        Harmony.CreateAndPatchAll(typeof(BasicPatches));
+        Harmony.CreateAndPatchAll(typeof(SpeedPatches));
+        Harmony.CreateAndPatchAll(typeof(ScalePatch));
     }
 
     /// <summary>
@@ -108,32 +123,49 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     }
 
     /// <summary>
-    /// Foot IK offsets.
+    /// Cache for scales in this class.
     /// </summary>
-    private Dictionary<uint, (float, float)> _footIKOffsets = new Dictionary<uint, (float, float)>();
-
-    private float ReadFootLiftupLimit(FootIK footIK)
-    {
-        return footIK.footLiftupLimit_; // Reflection not needed in IL2CPP context.
-        /*FieldInfo fi = typeof(FootIK).GetField("footLiftupLimit_", BindingFlags.NonPublic | BindingFlags.Instance);
-        return (float)(fi.GetValue(footIK));*/
-    }
-
     private Dictionary<uint, float> _scaleCache;
 
+    /// <summary>
+    /// Fetching the scale for the Collider updater.
+    /// </summary>
+    /// <param name="characterId"></param>
+    /// <returns></returns>
     public float? FetchScale(uint characterId)
     {
         if (this._scaleCache == null)
         {
-            return null;
+            this._scaleCache = this._sizeMemoryStorage.SizeValues;
+            if (this._scaleCache == null)
+            {
+                return null;
+            }            
         }
 
-        if (this._scaleCache.ContainsKey(characterId))
+        if (this._scaleCache.TryGetValue(characterId, out float s))
         {
-            return this._scaleCache[characterId];
+            return s;
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Active characters - cleared in every Update() as written by ScaleDbModelChara.
+    /// </summary>
+    private List<uint> _activeCharacterCache = new List<uint>();
+
+    /// <summary>
+    /// Writes an entry to the active character list.
+    /// </summary>
+    /// <param name="id"></param>
+    public void MarkCharacterIdActive(uint id)
+    {
+        if (!this._activeCharacterCache.Contains(id))
+        {
+            this._activeCharacterCache.Add(id);
+        }
     }
 
     /// <summary>
@@ -147,44 +179,8 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         this._scaleCache = scales;
 
         // Determine active characters
-        List<uint> activeCharacters = new List<uint>();
-        DbModelChara[] o = GameObject.FindObjectsOfType<DbModelChara>().ToArray(); //Search for characters
-
-        foreach (DbModelChara c in o) //Inspect
-        {
-            if (c.model_id_ != null) //Character has a valid id
-            {
-                uint mdlId = c.model_id_.model_;
-                if (!activeCharacters.Contains(mdlId))
-                {
-                    activeCharacters.Add(mdlId);
-                }
-                if (scales.ContainsKey(mdlId))
-                {
-                    DbModelBase.DbModelBaseObjectManager om = c.transform.GetComponentInChildren<DbModelBase.DbModelBaseObjectManager>(); //Load her object manager
-                    float s = scales[mdlId];
-                    if (om != null && om.transform.localPosition.x != s)
-                    {
-                        om.transform.localScale = new Vector3(s, s, s);
-                    }
-
-                    FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
-                    if (footIK != null)
-                    {
-                        if (!_footIKOffsets.ContainsKey(mdlId))
-                        {
-                            _footIKOffsets.Add(mdlId, (footIK.putOffset_.y, ReadFootLiftupLimit(footIK)));
-                        }
-                        (float fPut, float fUp) = _footIKOffsets[mdlId];
-                        footIK.putOffset_ = new Vector3(footIK.putOffset_.x, s * fPut, footIK.putOffset_.z);
-                        footIK.SetFootLiftupLimit(s * fUp);
-                    }
-                }
-            }
-        }
-
-        // Store the character ID into memory.
-        this._sizeMemoryStorage.UpdateCharacterList(activeCharacters);
+        this._sizeMemoryStorage.UpdateCharacterList(_activeCharacterCache);
+        _activeCharacterCache.Clear();                
     }
 
     /// <summary>

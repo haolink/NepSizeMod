@@ -176,6 +176,11 @@ namespace NepSizeCore
         private string _extraSettingsJson;
 
         /// <summary>
+        /// Socket request times to prevent DoSing.
+        /// </summary>
+        private Queue<long> _requestTimes;
+
+        /// <summary>
         /// Constructor.
         /// </summary>
         /// <param name="characterList"></param>
@@ -183,6 +188,8 @@ namespace NepSizeCore
         /// <param name="port"></param>
         public WebUI(CharacterList characterList, string ipString = null, int port = 7979, bool filterLocalSubnetOnly = true, Object settingsObject = null)
         {
+            this._requestTimes = new Queue<long>();
+
             this._extraSettings = new List<SettingsDescriptor>();
             if (settingsObject != null)
             {
@@ -271,6 +278,17 @@ namespace NepSizeCore
 
             _localSubnets = GetLocalIPSubnets();
         }
+        
+        /// <summary>
+        /// Converts date time to milliseconds.
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <returns></returns>
+        private long DateTimeToMilliseconds(DateTime dt)
+        {
+            DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            return (long)((dt - epoch).TotalMilliseconds);            
+        }
 
         /// <summary>
         /// When a message via websocket has been received.
@@ -279,6 +297,36 @@ namespace NepSizeCore
         /// <param name="handler"></param>
         internal void ReceivedMessageFromSocket(string message, WebUIJsonHandler handler)
         {
+            long currentTimestamp = this.DateTimeToMilliseconds(DateTime.UtcNow);
+            long gapTimestamp = currentTimestamp - 60000;
+
+            this._requestTimes.Enqueue(currentTimestamp);
+
+            while (this._requestTimes.Count > 0 && this._requestTimes.Peek() < gapTimestamp) // Dequeue entries older than 60 seconds.
+            {
+                this._requestTimes.Dequeue();
+            }
+
+            if (this._requestTimes.Count > 600)
+            {
+                this.DebugLog("More than 600 requests in the last 60 seconds!");
+                return;
+            }
+
+            try
+            {
+                using (var stringReader = new StringReader(message))
+                using (var jsonReader = new JsonTextReader(stringReader))
+                {
+                    (new JsonSerializer()).Deserialize(jsonReader);
+                }
+            }
+            catch (Exception ex) 
+            {
+                this.DebugLog("Invalid JSON input: " + ex.Message);
+                return;
+            }
+
             if (this.MessageReceived != null)
             {
                 this.MessageReceived(this, new WebSocketMessageEvent(message, handler));
