@@ -1,6 +1,7 @@
 using BepInEx.Configuration;
 using CharaIK;
 using Game.UI;
+using HarmonyLib;
 using NepSizeCore;
 using NepSizeSVSMono;
 using System;
@@ -73,6 +74,12 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         // Initiliase thread and storage.
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
         this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage, this._extraSettings);
+
+        // Initialise patches now.
+        Harmony.CreateAndPatchAll(typeof(BasicPatches));
+        Harmony.CreateAndPatchAll(typeof(ScalePatch));
+        Harmony.CreateAndPatchAll(typeof(CameraPatches));
+        Harmony.CreateAndPatchAll(typeof(SpeedPatches));
     }
 
     /// <summary>
@@ -119,7 +126,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     /// </summary>
     private void FixedUpdate()
     {
-        // Fire actions of the pipe thread on the Unity main queue.
+        // Fire actions of the data thread on the Unity main queue.
         this._sizeDataThread.HandleConnectionQueue();        
     }
 
@@ -151,32 +158,27 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         return null;
     }
 
-    /// <summary>
-    /// Check if a parent object of the GameObject go has a component of type T.
+    ///<summary>
+    /// Active characters - cleared in every Update() as written by ScaleDbModelChara.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="child"></param>
-    /// <returns></returns>
-    public T GetComponentInParentChain<T>(GameObject go) where T : Component
+    private List<uint> _activeCharacterCache = new List<uint>();
+
+    /// <summary>
+    /// Writes an entry to the active character list.
+    /// </summary>
+    /// <param name="id"></param>
+    public void MarkCharacterIdActive(uint id)
     {
-        Transform current = go.transform.parent;
-
-        while (current != null)
+        if (!this._activeCharacterCache.Contains(id))
         {
-            T component = current.GetComponent<T>();
-            if (component != null)
-            {
-                return component;
-            }
-            current = current.parent;
+            this._activeCharacterCache.Add(id);
         }
-
-        return null;
     }
 
-    public float PlayerScale = 1.0f;
-
-    public uint PlayerModelId = 0;
+    /// <summary>
+    /// Cached game UI.
+    /// </summary>
+    private GameUi _cachedGameUI = null;
 
     /// <summary>
     /// Update: read active characters and set their scales.
@@ -185,86 +187,32 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     {
         // Read scales from memory
         Dictionary<uint, float> scales = this._sizeMemoryStorage.SizeValues;
+
         this._scaleCache = scales;
 
         // Determine active characters
-        List<uint> activeCharacters = new List<uint>();
-        DbModelChara[] o = GameObject.FindObjectsOfType<DbModelChara>().ToArray(); //Search for characters
+        this._sizeMemoryStorage.UpdateCharacterList(_activeCharacterCache);
+        _activeCharacterCache.Clear();
 
-        /*MapUnitCollision muc = new MapUnitCollision();
-        muc.SetMoveVector()*/
-
-        float nPlayerScale = 1.0f;
-        uint? playerModelId = null;
-        bool isPlayer = false;
-
-        GameUi ui = GameObject.FindObjectOfType<GameUi>(true);
-        if (ui != null)
+        // Hide or unhide the Game UI.
+        if (_cachedGameUI == null)
+        {
+            GameUi ui = GameObject.FindObjectOfType<GameUi>(true);
+            if (ui != null)
+            {
+                _cachedGameUI = ui;
+            }
+        }
+        
+        if (_cachedGameUI != null)
         {
             bool shouldBeOn = !this.ExtraSettings.DisableUI;
-            if (ui.gameObject.activeSelf != shouldBeOn)
+            if (_cachedGameUI.gameObject.activeSelf != shouldBeOn)
             {
-                ui.gameObject.SetActive(shouldBeOn);
+                _cachedGameUI.gameObject.SetActive(shouldBeOn);
             }
         }
-
-        foreach (DbModelChara c in o) //Inspect
-        {
-            if (c.GetModelID()  != null) //Character has a valid id
-            {
-                uint mdlId = c.GetModelID().GetModel();
-                if (!activeCharacters.Contains(mdlId))
-                {
-                    activeCharacters.Add(mdlId);
-                }
-
-                isPlayer = (GetComponentInParentChain<MapUnitTypePlayerComponent>(c.gameObject) != null);
-                if (isPlayer)
-                {
-                    playerModelId = mdlId;
-                }
-
-                if (scales.ContainsKey(mdlId))
-                {
-                    DbModelBase.DbModelBaseObjectManager om = c.transform.GetComponentInChildren<DbModelBase.DbModelBaseObjectManager>(); //Load her object manager
-                    float s = scales[mdlId];
-                    if (om != null && om.transform.localPosition.x != s)
-                    {
-                        om.transform.localScale = new Vector3(s, s, s);
-                    }
-
-                    if (isPlayer)
-                    {
-                        nPlayerScale = s;
-                    }
-
-                    FootIK footIK = c.transform.GetComponentInChildren<FootIK>();
-                    if (footIK != null)
-                    {
-                        if (!_footIKOffsets.ContainsKey(mdlId))
-                        {
-                            _footIKOffsets.Add(mdlId, (footIK.putOffset_.y, ReadFootLiftupLimit(footIK)));
-                        }
-
-                        (float fPut, float fUp) = _footIKOffsets[mdlId];
-                        footIK.putOffset_ = new Vector3(footIK.putOffset_.x, s * fPut, footIK.putOffset_.z);
-                        footIK.SetFootLiftupLimit(s * fUp);
-                    }
-                }
-            }
-        }
-
-        //DungeonCamera dg = new DungeonCamera();        
-
-        // Store the character ID into memory.
-        this._sizeMemoryStorage.UpdateCharacterList(activeCharacters);
-
-        this.PlayerScale = nPlayerScale;
-        if (playerModelId != null)
-        {
-            this.PlayerModelId = playerModelId.Value;
-        }
-    }
+    }    
 
     /// <summary>
     /// Debug output.
