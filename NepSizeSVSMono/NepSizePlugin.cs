@@ -68,6 +68,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         CoreConfig.SERVER_IP = listenAddress.Value;
         CoreConfig.SERVER_PORT = listenPort.Value;
         CoreConfig.SERVER_LOCAL_SUBNET_ONLY = listenSubnetOnly.Value;
+        CoreConfig.WEBUI_TITLE = "SVS Scales";
 
         this._extraSettings = new AddtlSettings();
 
