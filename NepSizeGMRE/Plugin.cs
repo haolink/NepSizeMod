@@ -21,8 +21,14 @@ public static class PluginInfo
 [BepInPlugin("net.gamindustri.plugins.nepsize.gmre", PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
 public class Plugin : BasePlugin
 {
+    /// <summary>
+    /// Logger.
+    /// </summary>
     internal static new ManualLogSource Log;
 
+    /// <summary>
+    /// Plugin loader.
+    /// </summary>
     public override void Load()
     {
         // Plugin startup logic

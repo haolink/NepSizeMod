@@ -8,8 +8,10 @@ using Spine.Unity;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
+/// <summary>
+/// Basic plugin info.
+/// </summary>
 public static class PluginInfo
 {
     public const string PLUGIN_GUID = "NepSizeSnepRPG";
@@ -20,9 +22,15 @@ public static class PluginInfo
     public static string AssetsFolder = Paths.PluginPath + "\\" + PluginInfo.PLUGIN_GUID + "\\Assets";
 }
 
+/// <summary>
+/// Main plugin for Super Neptunia RPG.
+/// </summary>
 [BepInPlugin("net.gamindustri.plugins.nepsize.sneprpg", MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
 public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
 {
+    /// <summary>
+    /// Logger.
+    /// </summary>
     internal static new ManualLogSource Logger;
 
     /// <summary>
@@ -45,6 +53,10 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
     /// </summary>
     private DateTime _lastObjectScan = DateTime.MinValue;
 
+#pragma warning disable IDE0051
+    /// <summary>
+    /// Unity initialistion.
+    /// </summary>
     private void Awake()
     {
         // Plugin startup logic
@@ -70,12 +82,21 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
         this._sizeMemoryStorage = SizeMemoryStorage.Instance(this);
         this._sizeDataThread = new SizeDataThread(this, this._sizeMemoryStorage);        
     }
+#pragma warning restore IDE0051
 
+    /// <summary>
+    /// Implementation of DebugLog.
+    /// </summary>
+    /// <param name="message"></param>
     void INepSizeGamePlugin.DebugLog(string message)
     {
         Debug.Log("Callback: " + message);
     }
 
+    /// <summary>
+    /// Implementation of GetActiveCharacterIds of interface.
+    /// </summary>
+    /// <returns></returns>
     List<uint> INepSizeGamePlugin.GetActiveCharacterIds()
     {
         return this._sizeMemoryStorage.ActiveCharacters;
@@ -118,6 +139,7 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
         return this._sizeMemoryStorage.SizeValues;
     }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Game can drastically lower the Fixed Update rate if it pauses.
     /// </summary>
@@ -128,6 +150,7 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
         // Update this so that Update() wouldn't need to step in.
         _lastUp = DateTime.Now;
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Mesh renderer cache.
@@ -208,6 +231,10 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
         return null;
     }
 
+#pragma warning disable IDE0051
+    /// <summary>
+    /// Update scales.
+    /// </summary>
     private void Update()
     {
         // In other games this is only done in FixedUpdate - again this game might
@@ -275,6 +302,7 @@ public class Plugin : BaseUnityPlugin, INepSizeGamePlugin
         // Store the character ID into memory.
         this._sizeMemoryStorage.UpdateCharacterList(activeCharacters);
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Clean up the thread.

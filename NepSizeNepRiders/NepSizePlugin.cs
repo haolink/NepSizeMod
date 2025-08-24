@@ -38,6 +38,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     /// </summary>
     public SizeMemoryStorage SizeMemoryStorage {  get { return _sizeMemoryStorage; } }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Init on Unity side.
     /// </summary>
@@ -68,6 +69,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
 
         Harmony.CreateAndPatchAll(typeof(ScaleDbModelChara));
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Pass character size updates into memory.
@@ -105,6 +107,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         _sizeDataThread.CloseThread();
     }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Fixed update.
     /// </summary>
@@ -113,6 +116,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         // Fire actions of the pipe thread on the Unity main queue.
         this._sizeDataThread.HandleConnectionQueue();
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Active characters - cleared in every Update() as written by ScaleDbModelChara.
@@ -131,6 +135,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         }
     }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Update: submit active characters to Size Memory Storage.
     /// </summary>
@@ -142,6 +147,8 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         // Early update in the hooks can update again!
         _activeCharacterCache.Clear();
     }
+#pragma warning restore IDE0051
+
 
     /// <summary>
     /// Debug output.

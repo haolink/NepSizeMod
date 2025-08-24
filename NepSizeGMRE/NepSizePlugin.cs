@@ -40,6 +40,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     /// </summary>
     public AddtlSettings ExtraSettings { get { return _extraSettings; } }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Init on Unity side.
     /// </summary>
@@ -76,6 +77,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         Harmony.CreateAndPatchAll(typeof(SpeedPatches));
         Harmony.CreateAndPatchAll(typeof(ScalePatch));
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Pass character size updates into memory.
@@ -113,6 +115,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         _sizeDataThread.CloseThread();
     }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Fixed update.
     /// </summary>
@@ -121,6 +124,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         // Fire actions of the pipe thread on the Unity main queue.
         this._sizeDataThread.HandleConnectionQueue();
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Cache for scales in this class.
@@ -168,6 +172,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         }
     }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Update: read active characters and set their scales.
     /// </summary>
@@ -182,6 +187,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         this._sizeMemoryStorage.UpdateCharacterList(_activeCharacterCache);
         _activeCharacterCache.Clear();                
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Debug output.

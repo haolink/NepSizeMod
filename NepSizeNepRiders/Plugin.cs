@@ -1,7 +1,6 @@
 ﻿using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
-using Il2CppInterop.Runtime.Injection;
 
 /// <summary>
 /// Basic plugin info.
@@ -22,8 +21,14 @@ public static class PluginInfo
 [BepInPlugin("net.gamindustri.plugins.nepsize.nepriders", PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
 public class Plugin : BasePlugin
 {
+    /// <summary>
+    /// Logger.
+    /// </summary>
     internal static new ManualLogSource Log;
 
+    /// <summary>
+    /// Plugin loader.
+    /// </summary>
     public override void Load()
     {
         // Plugin startup logic

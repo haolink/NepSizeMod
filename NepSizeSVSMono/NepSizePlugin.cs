@@ -47,6 +47,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     /// </summary>
     public AddtlSettings ExtraSettings { get { return _extraSettings; } }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Init on Unity side.
     /// </summary>
@@ -82,6 +83,8 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         Harmony.CreateAndPatchAll(typeof(CameraPatches));
         Harmony.CreateAndPatchAll(typeof(SpeedPatches));
     }
+#pragma warning restore IDE0051
+
 
     /// <summary>
     /// Pass character size updates into memory.
@@ -122,6 +125,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         }        
     }
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Fixed update.
     /// </summary>
@@ -130,20 +134,23 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
         // Fire actions of the data thread on the Unity main queue.
         this._sizeDataThread.HandleConnectionQueue();        
     }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Foot IK offsets.
     /// </summary>
     private Dictionary<uint, (float, float)> _footIKOffsets = new Dictionary<uint, (float, float)>();
 
-    private float ReadFootLiftupLimit(FootIK footIK)
-    {
-        FieldInfo fi = typeof(FootIK).GetField("footLiftupLimit_", BindingFlags.NonPublic | BindingFlags.Instance);
-        return (float)(fi.GetValue(footIK));
-    }
-
+    /// <summary>
+    /// Cache for scales.
+    /// </summary>
     private Dictionary<uint, float> _scaleCache;
 
+    /// <summary>
+    /// Fetch a scale for the patchers.
+    /// </summary>
+    /// <param name="characterId"></param>
+    /// <returns></returns>
     public float? FetchScale(uint characterId)
     {
         if (this._scaleCache == null)
@@ -181,6 +188,7 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
     /// </summary>
     private GameUi _cachedGameUI = null;
 
+#pragma warning disable IDE0051
     /// <summary>
     /// Update: read active characters and set their scales.
     /// </summary>
@@ -213,7 +221,8 @@ public class NepSizePlugin : MonoBehaviour, INepSizeGamePlugin
                 _cachedGameUI.gameObject.SetActive(shouldBeOn);
             }
         }
-    }    
+    }
+#pragma warning restore IDE0051
 
     /// <summary>
     /// Debug output.
