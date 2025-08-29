@@ -1,6 +1,6 @@
 # Nep Size plugins
 This repository contains the source code of the size mods I developed for the following games:
-- Neptunia: Sisters Vs Sisters
+- Neptunia: Sisters Vs Sisters (both IL2CPP and Mono)
 - Neptunia Game Maker R:Evolution
 - Neptunia Riders VS Dogoos
 - Super Neptunia RPG
@@ -17,6 +17,7 @@ All interactions with Unity are done in the game specific mods - as the games al
 ## Game specific projects:
 
 - **NepSizeSVSMono**: This is for the [SvSFix](https://github.com/KingKrouch/SvSFix) version of Sisters vs Sisters. As of such this is only working on the Steam version of the game, BepInEx 6 does not like the IL2CPP version of this game. The default webserver port is 8989.
+- **NepSizeSVSIL2CPP**: This is an experimental BepInEx build. It is using [BepInEx 6-768 from the Nightly Page](https://builds.bepinex.dev/projects/bepinex_be) - to run it uses a fork of Il2CppInterop which is available [on my GitHub](https://github.com/haolink/Il2CppInterop) - you must build this version and take Il2CppInterop.Runtime.dll from the build files. This Runtime library will also make plugins such as Unity Explorer functional, it fixes BepInEx for this game completely. It also uses port 8989 by default.
 - **NepSizeGMRE**: This mod is a BepInEx 6.0-pre-2 based mod for the Xbox PC version of Neptunia Game Maker R:Evolution. It is very likely this will also work on the Steam version. The default webserver port is 7979.
 - **NepSizeNepRiders**: And this one is for Neptunia Riders - this is also BepInEx 6.0-pre-2 based. The default webserver port is 9898.
 - **NepSizeYuushaNeptune**: And now we have Super Neptunia RPG (Yuusha Neptune in Japan) - this one uses a very old version of Unity so it is compiled using .NET 3.5 standards. The default webserver port is 7878.
