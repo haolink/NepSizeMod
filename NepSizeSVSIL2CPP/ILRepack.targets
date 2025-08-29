@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- ILRepack -->
+  <Target Name="ILRepacker" AfterTargets="Build">
+    <ItemGroup>
+      <AssembliesToMerge Include="$(OutputPath)$(AssemblyName).dll" />
+      <AssembliesToMerge Include="$(OutputPath)NepSizeCore.dll" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <LibraryPaths Include="./Dependencies" />
+      <LibraryPaths Include="$(UserProfile)/.nuget/packages/bepinex.core/6.0.0-be.738/lib/netstandard2.0" />
+      <LibraryPaths Include="$(UserProfile)/.nuget/packages/system.text.json/4.6.0/lib/netstandard2.0" />
+    </ItemGroup>
+
+    <ILRepack
+      InputAssemblies="@(AssembliesToMerge)"
+      Internalize="false"
+      Verbose="false"
+      DebugInfo="true"
+      Parallel="true"
+      LibraryPath="@(LibraryPaths)"
+      OutputFile="$(OutputPath)/$(AssemblyName)Merged.dll"
+    />
+  </Target>
+</Project>
