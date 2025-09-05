@@ -6,6 +6,8 @@ using Il2CppInterop.Runtime;
 using Il2CppSystem.Runtime.CompilerServices;
 using UnityEngine;
 
+using System.Runtime.CompilerServices;
+
 public class SpeedPatches
 {
     /// <summary>
@@ -90,7 +92,7 @@ public class SpeedPatches
     /// <summary>
     /// Cache for battle NPCs to the speed cache.
     /// </summary>
-    private static readonly ConditionalWeakTable<AIBattleBase, SpeedUidHolder> AINPC_CACHE = new();
+    private static readonly Il2CppWeakDictionary<AIBattleBase, SpeedUidHolder> AINPC_CACHE = new();
 
     /// <summary>
     /// Patch the speed of an NPC in battles.
@@ -218,7 +220,7 @@ public class SpeedPatches
     /// <summary>
     /// Cache map for City NPCs and following NPCs.
     /// </summary>
-    private static readonly ConditionalWeakTable<PointRoutePlay, SpeedUidHolder> MAP_ROUTE_TO_SPEED = new ConditionalWeakTable<PointRoutePlay, SpeedUidHolder>();
+    private static readonly Il2CppWeakDictionary<PointRoutePlay, SpeedUidHolder> MAP_ROUTE_TO_SPEED = new();
 
     /// <summary>
     /// Adjust the speed of city NPCs.
